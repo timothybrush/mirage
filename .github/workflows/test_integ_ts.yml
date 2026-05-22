@@ -1,0 +1,108 @@
+name: Integ TS (cross-backend)
+
+"on":
+  push:
+    branches: [main]
+    paths:
+      - integ/**
+      - typescript/**
+      - .github/workflows/test_integ_ts.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - integ/**
+      - typescript/**
+      - .github/workflows/test_integ_ts.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integ:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio123
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      S3_BUCKET: mirage-integ
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Install dependencies
+        working-directory: typescript
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build mirage-core
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-core build
+
+      - name: Build mirage-node
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-node build
+
+      - name: Create MinIO bucket
+        run: |
+          curl -sSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tmp/mc
+          chmod +x /tmp/mc
+          /tmp/mc alias set local http://localhost:9000 minio minio123
+          /tmp/mc mb local/mirage-integ || true
+
+      - name: Run RAM backend and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx ram.ts > /tmp/ts-ram.out
+          diff truth.txt /tmp/ts-ram.out
+
+      - name: Run Disk backend and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx disk.ts > /tmp/ts-disk.out
+          diff truth.txt /tmp/ts-disk.out
+
+      - name: Run Redis backend and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx redis.ts > /tmp/ts-redis.out
+          diff truth.txt /tmp/ts-redis.out
+
+      - name: Run S3 (MinIO) backend and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx s3.ts > /tmp/ts-s3.out
+          diff truth.txt /tmp/ts-s3.out

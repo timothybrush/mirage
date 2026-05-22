@@ -182,6 +182,25 @@ importers:
         specifier: ^7.2.6
         version: 7.3.2(@types/node@24.12.2)(tsx@4.21.0)(yaml@2.8.3)
 
+  ../integ:
+    dependencies:
+      '@struktoai/mirage-core':
+        specifier: workspace:*
+        version: link:../typescript/packages/core
+      '@struktoai/mirage-node':
+        specifier: workspace:*
+        version: link:../typescript/packages/node
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.17
+      tsx:
+        specifier: ^4.20.0
+        version: 4.21.0
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/agents:
     dependencies:
       '@struktoai/mirage-core':
