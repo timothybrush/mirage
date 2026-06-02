@@ -95,25 +95,67 @@ def _document_detail(doc: tuple) -> dict:
     return detail
 
 
+def _build_record(doc_id: str, content: str, score: float) -> dict:
+    doc = DOC_BY_ID[doc_id]
+    return {
+        "segment": {
+            "id": f"{doc_id}:{score:.2f}",
+            "document_id": doc_id,
+            "content": content,
+            "document": {
+                "id": doc[0],
+                "data_source_type": "upload_file",
+                "name": doc[1],
+                "doc_type": None,
+                "doc_metadata": _document_summary(doc)["doc_metadata"],
+            },
+        },
+        "child_chunks": [],
+        "score": score,
+        "tsne_position": None,
+        "files": [],
+        "summary": None,
+    }
+
+
 def _retrieve_records(query: str) -> list[dict]:
     lowered = query.lower()
     if "throttl" in lowered or "rate" in lowered or "429" in lowered:
-        contents = [
-            "Requests are rate limited to 100 calls per minute per token.",
-            "If you exceed the limit you receive HTTP 429 and must back off.",
+        return [
+            _build_record(
+                "doc-auth",
+                "Requests are rate limited to 100 calls per minute per token.",
+                0.92,
+            ),
+            _build_record(
+                "doc-auth",
+                ("If you exceed the limit you receive HTTP 429 and must "
+                 "back off."),
+                0.88,
+            ),
         ]
     elif "refund" in lowered or "money" in lowered:
-        contents = [
-            "Refunds are available within 30 days of purchase.",
-            "Approved refunds are processed within five business days.",
+        return [
+            _build_record(
+                "doc-refunds",
+                "Refunds are available within 30 days of purchase.",
+                0.91,
+            ),
+            _build_record(
+                "doc-refunds",
+                "Approved refunds are processed within five business days.",
+                0.84,
+            ),
         ]
     elif "encrypt" in lowered or "privacy" in lowered:
-        contents = [
-            "Customer data is stored encrypted at rest and in transit."
+        return [
+            _build_record(
+                "doc-privacy",
+                "Customer data is stored encrypted at rest and in transit.",
+                0.89,
+            )
         ]
-    else:
-        contents = []
-    return [{"segment": {"content": content}} for content in contents]
+    return []
 
 
 class DifyMockHandler(BaseHTTPRequestHandler):
