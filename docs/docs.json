@@ -136,7 +136,8 @@
                 "pages": [
                   "home/setup/dropbox",
                   "home/setup/box",
-                  "home/setup/nextcloud"
+                  "home/setup/nextcloud",
+                  "home/setup/databricks"
                 ]
               },
               {
