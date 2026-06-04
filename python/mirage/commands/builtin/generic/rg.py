@@ -2,8 +2,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from functools import partial
 
 from mirage.cache.index import IndexCacheStore
-from mirage.commands.builtin.grep_helper import (compile_pattern, grep_lines,
-                                                 grep_stream)
+from mirage.commands.builtin.grep_helper import (compile_pattern,
+                                                 grep_count_has_matches,
+                                                 grep_lines, grep_stream,
+                                                 nonzero_count_stream)
 from mirage.commands.builtin.rg_helper import rg_full
 from mirage.commands.builtin.utils.lines import split_lines
 from mirage.commands.builtin.utils.output import (format_optional_records,
@@ -43,6 +45,42 @@ async def rg(
     scope_check: Callable[..., Awaitable[str | None]] | None = None,
     index: IndexCacheStore | None = None,
 ) -> tuple[ByteSource | None, IOResult]:
+    """Run ripgrep-style fallback search over backend paths or stdin.
+
+    Args:
+        paths (list[PathSpec]): Backend paths to search. Empty paths consume
+            stdin.
+        pattern (str): Pattern text from CLI arguments.
+        readdir (Callable[..., Awaitable[list[str]]]): Directory reader.
+        stat (Callable[[PathSpec], Awaitable[FileStat]]): Backend stat reader.
+        read_bytes (Callable[..., Awaitable[bytes]]): Whole-file reader.
+        read_stream (Callable[..., AsyncIterator[bytes]] | None): Optional
+            stream reader.
+        accessor (object): Backend accessor passed through wrapper helpers.
+        stdin (AsyncIterator[bytes] | bytes | None): Input used when paths is
+            empty.
+        ignore_case (bool): `-i`, case-insensitive matching.
+        invert (bool): `-v`, select non-matching lines.
+        line_numbers (bool): `-n`, prefix line numbers.
+        count_only (bool): `-c`, output counts and omit zero-count files.
+        files_only (bool): `-l`, output only matching file paths.
+        whole_word (bool): `-w`, match whole words.
+        fixed_string (bool): `-F`, treat pattern as a literal string.
+        only_matching (bool): `-o`, output only matched text.
+        max_count (int | None): `-m`, stop after this many matching lines.
+        context_before (int): `-B`, leading context lines.
+        context_after (int): `-A`, trailing context lines.
+        hidden (bool): Include hidden files while scanning directories.
+        file_type (str | None): `--type`, filter directory scan by file type.
+        glob_pattern (str | None): `--glob`, filter directory scan by glob.
+        scope_check (Callable[..., Awaitable[str | None]] | None): Optional
+            backend warning hook.
+        index (IndexCacheStore | None): Optional cache index for wrapped
+            backend calls.
+
+    Returns:
+        tuple[ByteSource | None, IOResult]: Output stream and exit metadata.
+    """
     if paths:
         mount_prefix = paths[0].prefix
         rd = partial(call_readdir,
@@ -120,7 +158,7 @@ async def rg(
                                   count_only, files_only, only_matching,
                                   max_count)
                 if count_only:
-                    if hits:
+                    if grep_count_has_matches(hits):
                         all_results.append(f"{p.original}:{hits[0]}")
                 elif files_only:
                     all_results.extend(hits)
@@ -144,6 +182,8 @@ async def rg(
             max_count=max_count,
             count_only=count_only,
         )
+        if count_only:
+            stream = nonzero_count_stream(stream)
         io = IOResult()
         return exit_on_empty(stream, io), io
 
@@ -158,6 +198,8 @@ async def rg(
         max_count=max_count,
         count_only=count_only,
     )
+    if count_only:
+        stream = nonzero_count_stream(stream)
     io = IOResult()
     return exit_on_empty(stream, io), io
 
