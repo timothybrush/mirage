@@ -18,6 +18,7 @@ import type { FindOptions } from '../../../resource/base.ts'
 import { PathSpec } from '../../../types.ts'
 import type { CommandFnResult } from '../../config.ts'
 import { copyTargets, isDirectory, pathExists, type StatFn } from '../utils/copy.ts'
+import { rstripSlash } from '../../../util/slash.ts'
 
 const ENC = new TextEncoder()
 
@@ -42,8 +43,8 @@ export async function cpGeneric(
   const lines: string[] = []
   for (const [src, target] of copyTargets(sources, dst, dstIsDir)) {
     if (recursive) {
-      const srcBase = src.stripPrefix.replace(/\/+$/, '')
-      const dstBase = target.stripPrefix.replace(/\/+$/, '')
+      const srcBase = rstripSlash(src.stripPrefix)
+      const dstBase = rstripSlash(target.stripPrefix)
       for (const entry of await find(src, { type: 'f' })) {
         const entryDst = dstBase + entry.slice(srcBase.length)
         const entryDstSpec = PathSpec.fromStrPath(entryDst, target.prefix)

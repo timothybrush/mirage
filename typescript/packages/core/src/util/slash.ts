@@ -12,22 +12,22 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import type { RAMAccessor } from '../../accessor/ram.ts'
-import type { PathSpec } from '../../types.ts'
-import { norm, nowIso } from './utils.ts'
-import { stripSlash } from '../../util/slash.ts'
+export function rstripSlash(s: string): string {
+  let end = s.length
+  while (end > 0 && s.charCodeAt(end - 1) === 47) end--
+  return s.slice(0, end)
+}
 
-export function mkdirP(accessor: RAMAccessor, path: PathSpec): Promise<void> {
-  const p = norm(path.stripPrefix)
-  const parts = stripSlash(p)
-    .split('/')
-    .filter((s) => s !== '')
-  const now = nowIso()
-  let current = ''
-  for (const part of parts) {
-    current += '/' + part
-    accessor.store.dirs.add(current)
-    if (!accessor.store.modified.has(current)) accessor.store.modified.set(current, now)
-  }
-  return Promise.resolve()
+export function lstripSlash(s: string): string {
+  let start = 0
+  while (start < s.length && s.charCodeAt(start) === 47) start++
+  return s.slice(start)
+}
+
+export function stripSlash(s: string): string {
+  let start = 0
+  let end = s.length
+  while (start < end && s.charCodeAt(start) === 47) start++
+  while (end > start && s.charCodeAt(end - 1) === 47) end--
+  return s.slice(start, end)
 }

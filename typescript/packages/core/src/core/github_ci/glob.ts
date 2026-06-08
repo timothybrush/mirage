@@ -18,6 +18,7 @@ import { fnmatch } from '../s3/_client.ts'
 import { PathSpec } from '../../types.ts'
 import { SCOPE_ERROR } from '../github/constants.ts'
 import { readdir } from './readdir.ts'
+import { stripSlash } from '../../util/slash.ts'
 
 export async function resolveGlob(
   accessor: GitHubCIAccessor,
@@ -56,6 +57,6 @@ export function isCrossRunRoot(path: PathSpec): boolean {
       original = rest === '' ? '/' : rest
     }
   }
-  const stripped = original.replace(/^\/+/, '').replace(/\/+$/, '')
+  const stripped = stripSlash(original)
   return stripped === '' || stripped === 'runs'
 }

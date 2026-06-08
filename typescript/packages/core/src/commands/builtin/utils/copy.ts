@@ -14,11 +14,12 @@
 
 import type { IndexCacheStore } from '../../../cache/index/store.ts'
 import { FileType, PathSpec, type FileStat } from '../../../types.ts'
+import { rstripSlash } from '../../../util/slash.ts'
 
 export type StatFn = (path: PathSpec, index?: IndexCacheStore) => Promise<FileStat>
 
 export function childPath(parent: PathSpec, name: string): PathSpec {
-  const base = parent.original.replace(/\/+$/, '')
+  const base = rstripSlash(parent.original)
   return PathSpec.fromStrPath(`${base}/${name}`, parent.prefix)
 }
 
@@ -35,7 +36,7 @@ export function copyTargets(
     return first === undefined ? [] : [[first, dst]]
   }
   return sources.map((src): [PathSpec, PathSpec] => {
-    const name = src.stripPrefix.replace(/\/+$/, '').split('/').pop() ?? ''
+    const name = rstripSlash(src.stripPrefix).split('/').pop() ?? ''
     return [src, childPath(dst, name)]
   })
 }

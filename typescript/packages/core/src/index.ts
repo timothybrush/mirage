@@ -1205,3 +1205,5 @@ export {
 export { HttpPostHogDriver, type HttpPostHogDriverOptions } from './core/posthog/http_driver.ts'
 
 export { setHttpProxyBase } from './commands/builtin/utils/http.ts'
+
+export { lstripSlash, rstripSlash, stripSlash } from './util/slash.ts'
