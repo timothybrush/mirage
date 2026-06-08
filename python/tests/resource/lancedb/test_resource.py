@@ -56,3 +56,13 @@ def test_resource_get_state_redacts_api_key():
     res = _resource(api_key="secret-value")
     state = res.get_state()
     assert "secret-value" not in str(state)
+
+
+def test_cloud_config_fields_and_remote():
+    res = _resource(uri="db://my-db",
+                    api_key="sk-xxx",
+                    region="us-west-2",
+                    host_override="https://my-db.region.api.lancedb.com")
+    assert res.is_remote is True
+    assert res.config.region == "us-west-2"
+    assert res.config.host_override.endswith("lancedb.com")

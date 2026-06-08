@@ -305,7 +305,8 @@
                 "icon": "database",
                 "pages": [
                   "python/resource/mongodb",
-                  "python/resource/postgres"
+                  "python/resource/postgres",
+                  "python/resource/lancedb"
                 ]
               },
               {

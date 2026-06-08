@@ -44,6 +44,12 @@ class LanceDBAccessor(Accessor):
             kwargs: dict[str, Any] = {}
             if self.config.api_key is not None:
                 kwargs["api_key"] = reveal_secret(self.config.api_key)
+            if self.config.storage_options:
+                kwargs["storage_options"] = self.config.storage_options
+            if self.config.uri.startswith("db://"):
+                kwargs["region"] = self.config.region
+                if self.config.host_override:
+                    kwargs["host_override"] = self.config.host_override
             db = await lancedb.connect_async(self.config.uri, **kwargs)
             self._dbs[key] = db
         return db

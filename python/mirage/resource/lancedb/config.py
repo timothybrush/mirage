@@ -18,6 +18,9 @@ from pydantic import BaseModel, SecretStr
 class LanceDBConfig(BaseModel):
     uri: str
     api_key: SecretStr | None = None
+    region: str = "us-east-1"
+    host_override: str | None = None
+    storage_options: dict[str, str] | None = None
     table: str | None = None
     group_by: list[str] = []
     id_column: str = "id"
