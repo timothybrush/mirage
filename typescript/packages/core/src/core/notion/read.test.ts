@@ -63,7 +63,7 @@ function pageBody(id: string, title: string): Record<string, unknown> {
     archived: false,
     parent: { type: 'workspace', workspace: true },
     properties: {
-      title: { title: [{ plain_text: title }] },
+      title: { type: 'title', title: [{ plain_text: title }] },
     },
   }
 }
@@ -92,16 +92,18 @@ describe('notion read', () => {
     const bytes = await read(makeAccessor(transport), spec(path), undefined)
     expect(bytes).toBeInstanceOf(Uint8Array)
     const decoded = decodeJson(bytes) as Record<string, unknown>
-    expect(decoded.id).toBe(PAGE_ID)
+    expect(decoded.page_id).toBe(PAGE_ID_DASHED)
     expect(decoded.title).toBe('My Page')
     expect(decoded.last_edited_time).toBe('2024-01-02T00:00:00Z')
     expect(decoded.created_time).toBe('2024-01-01T00:00:00Z')
     expect(decoded.archived).toBe(false)
+    expect(decoded.parent_type).toBe('workspace')
+    expect(decoded.parent_id).toBe(true)
+    expect(typeof decoded.markdown).toBe('string')
     expect(Array.isArray(decoded.blocks)).toBe(true)
     const blocks = decoded.blocks as { id: string }[]
-    expect(blocks).toHaveLength(2)
+    expect(blocks).toHaveLength(1)
     expect(blocks[0]?.id).toBe('block-1')
-    expect(blocks[1]?.id).toBe(CHILD_ID_DASHED)
     const calls = transport.invocations
     expect(calls).toHaveLength(2)
     const pageCall = calls.find((c) => c.name === 'API-retrieve-a-page')
@@ -125,7 +127,7 @@ describe('notion read', () => {
       undefined,
     )
     const decoded = decodeJson(bytes) as Record<string, unknown>
-    expect(decoded.id).toBe(PAGE_ID)
+    expect(decoded.page_id).toBe(PAGE_ID_DASHED)
     expect(decoded.title).toBe('Prefixed')
     expect(decoded.blocks).toEqual([])
   })
