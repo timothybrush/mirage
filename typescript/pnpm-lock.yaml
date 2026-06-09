@@ -202,6 +202,9 @@ importers:
       '@struktoai/mirage-node':
         specifier: workspace:*
         version: link:../typescript/packages/node
+      mongodb:
+        specifier: ^6.0.0
+        version: 6.21.0(socks@2.8.7)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

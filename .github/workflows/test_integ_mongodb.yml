@@ -5,23 +5,27 @@ name: Integ (mongodb)
     branches: [main]
     paths:
       - integ/mongodb.py
+      - integ/mongodb.ts
       - integ/truth_mongodb.txt
       - integ/check_lines.sh
       - python/mirage/accessor/mongodb.py
       - python/mirage/core/mongodb/**
       - python/mirage/commands/builtin/mongodb/**
       - python/mirage/resource/mongodb/**
+      - typescript/**
       - .github/workflows/test_integ_mongodb.yml
   pull_request:
     branches: [main]
     paths:
       - integ/mongodb.py
+      - integ/mongodb.ts
       - integ/truth_mongodb.txt
       - integ/check_lines.sh
       - python/mirage/accessor/mongodb.py
       - python/mirage/core/mongodb/**
       - python/mirage/commands/builtin/mongodb/**
       - python/mirage/resource/mongodb/**
+      - typescript/**
       - .github/workflows/test_integ_mongodb.yml
   workflow_dispatch:
 
@@ -67,3 +71,50 @@ jobs:
           set -o pipefail
           ./python/.venv/bin/python integ/mongodb.py 2>&1 \
             | bash integ/check_lines.sh integ/truth_mongodb.txt
+
+  integ-mongodb-ts:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MONGODB_URI: mongodb://localhost:27017
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Install dependencies
+        working-directory: typescript
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build mirage-core
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-core build
+
+      - name: Build mirage-node
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-node build
+
+      - name: Run MongoDB backend (TS) and check against truth
+        shell: bash
+        working-directory: integ
+        run: |
+          set -o pipefail
+          pnpm exec tsx mongodb.ts 2>&1 \
+            | bash check_lines.sh truth_mongodb.txt
