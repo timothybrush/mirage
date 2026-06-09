@@ -44,32 +44,33 @@ function richTextToMd(richTextList: unknown[]): string {
   return parts.join('')
 }
 
-function blockToMd(block: Json): string {
+function blockToMd(block: Json, indent: number): string {
   const btype = strOf(block, 'type')
   const content = asObject(block[btype])
   const text = richTextToMd(asArray(content.rich_text))
+  const prefix = '  '.repeat(indent)
 
-  if (btype === 'paragraph') return text
+  if (btype === 'paragraph') return `${prefix}${text}`
   if (btype === 'heading_1' || btype === 'heading_2' || btype === 'heading_3') {
     const level = Number.parseInt(btype.slice(-1), 10)
     return `${'#'.repeat(level)} ${text}`
   }
-  if (btype === 'bulleted_list_item') return `- ${text}`
-  if (btype === 'numbered_list_item') return `1. ${text}`
+  if (btype === 'bulleted_list_item') return `${prefix}- ${text}`
+  if (btype === 'numbered_list_item') return `${prefix}1. ${text}`
   if (btype === 'to_do') {
     const marker = content.checked === true ? 'x' : ' '
-    return `- [${marker}] ${text}`
+    return `${prefix}- [${marker}] ${text}`
   }
-  if (btype === 'toggle') return `<details><summary>${text}</summary></details>`
+  if (btype === 'toggle') return `${prefix}<details><summary>${text}</summary></details>`
   if (btype === 'code') {
     const language = strOf(content, 'language')
     return `\`\`\`${language}\n${text}\n\`\`\``
   }
-  if (btype === 'quote') return `> ${text}`
+  if (btype === 'quote') return `${prefix}> ${text}`
   if (btype === 'callout') {
     const icon = asObject(content.icon)
     const emoji = strOf(icon, 'type') === 'emoji' ? strOf(icon, 'emoji') : ''
-    return `> ${emoji} ${text}`
+    return `${prefix}> ${emoji} ${text}`
   }
   if (btype === 'divider') return '---'
   if (btype === 'image') {
@@ -86,14 +87,21 @@ function blockToMd(block: Json): string {
   if (btype === 'equation') return `$$${strOf(content, 'expression')}$$`
   if (btype === 'table_of_contents') return '[TOC]'
   if (btype === 'child_page' || btype === 'child_database') return ''
-  return text
+  return text !== '' ? `${prefix}${text}` : ''
+}
+
+function walkBlock(block: Json, indent: number, lines: string[]): void {
+  const line = blockToMd(block, indent)
+  if (line !== '' || strOf(block, 'type') === 'paragraph') lines.push(line)
+  for (const child of asArray(block.children)) {
+    walkBlock(asObject(child), indent + 1, lines)
+  }
 }
 
 export function blocksToMarkdown(blocks: readonly Json[]): string {
   const lines: string[] = []
   for (const block of blocks) {
-    const line = blockToMd(block)
-    if (line !== '' || strOf(block, 'type') === 'paragraph') lines.push(line)
+    walkBlock(block, 0, lines)
   }
   return lines.length > 0 ? lines.join('\n\n') + '\n' : ''
 }

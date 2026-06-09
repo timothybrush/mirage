@@ -76,12 +76,17 @@ describe('extractIdNoDashes', () => {
 })
 
 describe('pageSegmentName', () => {
-  it('returns title__id with dashes stripped from id', () => {
+  it('returns sanitized title__id with the raw dashed id', () => {
     const page = {
       id: '2c4e9c3a-1234-5678-90ab-cdef01234567',
-      properties: { title: { title: [{ plain_text: 'Hi' }] } },
+      properties: { title: { type: 'title', title: [{ plain_text: 'Hi There' }] } },
     }
-    expect(pageSegmentName(page)).toBe('Hi__2c4e9c3a1234567890abcdef01234567')
+    expect(pageSegmentName(page)).toBe('Hi_There__2c4e9c3a-1234-5678-90ab-cdef01234567')
+  })
+
+  it('falls back to "untitled" when the page has no title property', () => {
+    const page = { id: '2c4e9c3a-1234-5678-90ab-cdef01234567', properties: {} }
+    expect(pageSegmentName(page)).toBe('untitled__2c4e9c3a-1234-5678-90ab-cdef01234567')
   })
 })
 
@@ -121,7 +126,7 @@ describe('normalizePage', () => {
       created_time: '2025-01-01T00:00:00.000Z',
       last_edited_time: '2025-02-01T00:00:00.000Z',
       parent_type: 'workspace',
-      parent_id: true,
+      parent_id: '',
       archived: false,
       created_by: 'user-1',
       last_edited_by: 'user-2',

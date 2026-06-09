@@ -117,4 +117,20 @@ describe('blocksToMarkdown', () => {
   it('returns empty string for no blocks', () => {
     expect(blocksToMarkdown([])).toBe('')
   })
+
+  it('renders nested children with indentation', () => {
+    const blocks = [
+      {
+        type: 'bulleted_list_item',
+        bulleted_list_item: { rich_text: [{ plain_text: 'parent' }] },
+        children: [
+          {
+            type: 'bulleted_list_item',
+            bulleted_list_item: { rich_text: [{ plain_text: 'child' }] },
+          },
+        ],
+      },
+    ]
+    expect(blocksToMarkdown(blocks)).toBe('- parent\n\n  - child\n')
+  })
 })

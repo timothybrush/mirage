@@ -82,7 +82,7 @@ export function extractIdNoDashes(page: Json): string {
 }
 
 export function pageSegmentName(page: Json): string {
-  return formatSegment({ id: extractIdNoDashes(page), title: extractTitle(page) })
+  return formatSegment({ id: strOf(page, 'id'), title: pageContentTitle(page) })
 }
 
 function pageContentTitle(page: Json): string {
@@ -103,7 +103,7 @@ export interface NormalizedPage {
   created_time: string
   last_edited_time: string
   parent_type: string
-  parent_id: string | boolean
+  parent_id: string
   archived: boolean
   created_by: string
   last_edited_by: string
@@ -115,8 +115,7 @@ export function normalizePage(page: Json, blocks: readonly Json[]): NormalizedPa
   const parent = asObject(page.parent)
   const parentType = strOf(parent, 'type')
   const rawParentId = parent[parentType]
-  const parentId: string | boolean =
-    typeof rawParentId === 'string' || typeof rawParentId === 'boolean' ? rawParentId : ''
+  const parentId = typeof rawParentId === 'string' ? rawParentId : ''
   const contentBlocks = (blocks as Json[]).filter((block) => {
     const type = strOf(block, 'type')
     return type !== 'child_page' && type !== 'child_database'
