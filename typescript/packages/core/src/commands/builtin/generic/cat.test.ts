@@ -13,7 +13,7 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { describe, expect, it } from 'vitest'
-import { materialize } from '../../../io/types.ts'
+import { IOResult, materialize } from '../../../io/types.ts'
 import { FileStat, FileType, PathSpec } from '../../../types.ts'
 import type { CommandOpts } from '../../config.ts'
 import { catGeneric } from './cat.ts'
@@ -35,20 +35,23 @@ function opts(): CommandOpts {
 }
 
 async function* fileStream(path: string, pulled: string[]): AsyncIterable<Uint8Array> {
+  await Promise.resolve()
   pulled.push(path)
   yield ENC.encode(FILES[path] ?? '')
+}
+
+function statFn(p: PathSpec): Promise<FileStat> {
+  return Promise.resolve(new FileStat({ name: p.original, size: 1, type: FileType.TEXT }))
 }
 
 describe('catGeneric multi-file streaming', () => {
   it('records one reads entry per file, not the joined stream', async () => {
     const pulled: string[] = []
-    const [stdout, io] = await catGeneric(
-      [spec('/a.txt'), spec('/b.txt')],
-      [],
-      opts(),
-      async (p) => new FileStat({ name: p.original, size: 1, type: FileType.TEXT }),
-      (p) => fileStream(p.original, pulled),
+    const result = await catGeneric([spec('/a.txt'), spec('/b.txt')], [], opts(), statFn, (p) =>
+      fileStream(p.original, pulled),
     )
+    expect(result).not.toBeNull()
+    const [stdout, io] = result ?? [null, new IOResult()]
     expect(DEC.decode(await materialize(stdout))).toBe('a1\na2\na3\nb1\nb2\n')
     expect(DEC.decode(await materialize(io.reads['/a.txt']))).toBe('a1\na2\na3\n')
     expect(DEC.decode(await materialize(io.reads['/b.txt']))).toBe('b1\nb2\n')
@@ -56,16 +59,14 @@ describe('catGeneric multi-file streaming', () => {
 
   it('does not pull the second file when the consumer stops early', async () => {
     const pulled: string[] = []
-    const [stdout] = await catGeneric(
-      [spec('/a.txt'), spec('/b.txt')],
-      [],
-      opts(),
-      async (p) => new FileStat({ name: p.original, size: 1, type: FileType.TEXT }),
-      (p) => fileStream(p.original, pulled),
+    const result = await catGeneric([spec('/a.txt'), spec('/b.txt')], [], opts(), statFn, (p) =>
+      fileStream(p.original, pulled),
     )
+    const [stdout] = result ?? [null]
     const iter = (stdout as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
     const first = await iter.next()
-    expect(DEC.decode(first.value)).toBe('a1\na2\na3\n')
+    expect(first.done).toBe(false)
+    expect(DEC.decode(first.value as Uint8Array)).toBe('a1\na2\na3\n')
     expect(pulled).toEqual(['/a.txt'])
   })
 })

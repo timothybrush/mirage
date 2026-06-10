@@ -74,8 +74,7 @@ def _capture_io(ws: Workspace) -> list:
 
 def _assert_single_prefix(captured: list) -> None:
     for result in captured:
-        keys = (list(result.writes) + list(result.reads) +
-                list(result.cache))
+        keys = (list(result.writes) + list(result.reads) + list(result.cache))
         for key in keys:
             if key.startswith("/dev/"):
                 continue

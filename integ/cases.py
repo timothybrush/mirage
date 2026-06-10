@@ -466,6 +466,11 @@ EXIT_CODE_CASES: list[tuple[str, str]] = [
      "cat /data/sorted_a.txt /data/sorted_b.txt | head -n 4"),
     ("pipe_after_first", "cat /data/sorted_a.txt"),
     ("pipe_after_second", "cat /data/sorted_b.txt"),
+    ("lnzip_ls_warm", "ls -1 /data/sub"),
+    ("ln_create", "ln -s /data/sub/nested.txt /data/sub/link.txt"),
+    ("zip_create", "zip /data/sub/arch.zip /data/sub/nested.txt"),
+    ("lnzip_ls_after", "ls -1 /data/sub"),
+    ("ln_read_back", "cat /data/sub/link.txt"),
 ]
 
 

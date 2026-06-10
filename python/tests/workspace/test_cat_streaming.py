@@ -22,6 +22,7 @@ from mirage.workspace import Workspace
 
 
 def _spying_stream(real_stream, pulled: list[str]):
+
     def factory(accessor, p: PathSpec) -> AsyncIterator[bytes]:
         return _spy_iter(real_stream(accessor, p), p.original, pulled)
 
