@@ -26,6 +26,7 @@ export const HF_RESOURCES = [
 
 export abstract class HfAccessor extends Accessor {
   abstract readonly repoType: string
+  abstract readonly resourceName: ResourceName
   private operatorPromise: Promise<Operator> | null = null
 
   constructor(public readonly config: HfBucketsConfig | HfRepoConfig) {
@@ -85,6 +86,7 @@ function stripSlashes(value: string): string {
 
 export class HfBucketsAccessor extends HfAccessor {
   readonly repoType: string = 'bucket'
+  readonly resourceName: ResourceName = ResourceName.HF_BUCKETS
 
   get bucketUri(): string {
     return `hf://buckets/${this.repoId}`
@@ -93,6 +95,7 @@ export class HfBucketsAccessor extends HfAccessor {
 
 export class HfDatasetsAccessor extends HfAccessor {
   readonly repoType: string = 'dataset'
+  readonly resourceName: ResourceName = ResourceName.HF_DATASETS
 
   get bucketUri(): string {
     return `hf://datasets/${this.repoId}`
@@ -101,6 +104,7 @@ export class HfDatasetsAccessor extends HfAccessor {
 
 export class HfModelsAccessor extends HfAccessor {
   readonly repoType: string = 'model'
+  readonly resourceName: ResourceName = ResourceName.HF_MODELS
 
   get bucketUri(): string {
     return `hf://models/${this.repoId}`
@@ -109,6 +113,7 @@ export class HfModelsAccessor extends HfAccessor {
 
 export class HfSpacesAccessor extends HfAccessor {
   readonly repoType: string = 'space'
+  readonly resourceName: ResourceName = ResourceName.HF_SPACES
 
   get bucketUri(): string {
     return `hf://spaces/${this.repoId}`
