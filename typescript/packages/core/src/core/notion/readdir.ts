@@ -57,7 +57,7 @@ export async function readdir(
     if (index !== undefined) {
       const listing = await index.listDir(idxKey)
       if (listing.entries !== undefined && listing.entries !== null) {
-        return listing.entries
+        return listing.entries.map((entry) => `${prefix}${entry}`)
       }
     }
     const pages = await searchTopLevelPages(accessor.transport)
@@ -93,7 +93,7 @@ export async function readdir(
     if (index !== undefined) {
       const listing = await index.listDir(pageIdxKey)
       if (listing.entries !== undefined && listing.entries !== null) {
-        return listing.entries
+        return listing.entries.map((entry) => `${prefix}${entry}`)
       }
     }
 

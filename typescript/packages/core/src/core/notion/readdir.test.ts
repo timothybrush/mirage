@@ -142,6 +142,22 @@ describe('notion readdir pages', () => {
     expect([...out].sort()).toEqual([`/pages/Top1__${TOP1_ID}`])
     expect(transport.invocations).toHaveLength(1)
   })
+
+  it('keeps the mount prefix on warm index-cache hits', async () => {
+    const transport = new FakeTransport()
+    transport.enqueue('API-post-search', {
+      results: [topPage(TOP1_ID, 'Top1')],
+      has_more: false,
+      next_cursor: null,
+    })
+    const idx = new RAMIndexCacheStore()
+    const p = spec('/notion/pages', '/notion')
+    const cold = await readdir(makeAccessor(transport), p, idx)
+    const warm = await readdir(makeAccessor(transport), p, idx)
+    expect(warm).toEqual(cold)
+    expect(warm).toEqual([`/notion/pages/Top1__${TOP1_ID}`])
+    expect(transport.invocations).toHaveLength(1)
+  })
 })
 
 describe('notion readdir subtree', () => {

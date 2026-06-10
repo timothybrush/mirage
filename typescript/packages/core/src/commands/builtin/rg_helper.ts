@@ -134,7 +134,8 @@ function searchFile(
     if (opts.maxCount !== null && count.n >= opts.maxCount) break
   }
   if (opts.countOnly) {
-    return [String(count.n)]
+    if (count.n === 0) return []
+    return prefixPath !== null ? [`${prefixPath}:${String(count.n)}`] : [String(count.n)]
   }
   return results
 }
@@ -318,7 +319,8 @@ export async function rgFolderFiletype(
       maxCount: opts.maxCount,
     })
     if (opts.countOnly) {
-      if (hits.length > 0) results.push(`${entry}:${hits[0] ?? ''}`)
+      const c = hits[0] ?? '0'
+      if (c !== '0') results.push(`${entry}:${c}`)
     } else if (opts.filesOnly) {
       for (const h of hits) results.push(h)
     } else {

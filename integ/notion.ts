@@ -13,27 +13,7 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { createServer, type Server } from "node:http";
-import {
-  type FileStat,
-  type IndexCacheStore,
-  NOTION_COMMANDS,
-  NOTION_PROMPT,
-  NOTION_VFS_OPS,
-  NOTION_WRITE_PROMPT,
-  NotionAccessor,
-  type NotionTransport,
-  notionRead,
-  notionReaddir,
-  notionStat,
-  PathSpec,
-  RAMIndexCacheStore,
-  type RegisteredCommand,
-  type RegisteredOp,
-  type Resource,
-  ResourceName,
-  resolveNotionGlob,
-} from "@struktoai/mirage-core";
-import { MountMode, Workspace } from "@struktoai/mirage-node";
+import { MountMode, NotionResource, Workspace } from "@struktoai/mirage-node";
 
 const MOUNT = "/notion";
 const PAGE_A = "aaaa1111-2222-3333-4444-555566667777";
@@ -161,102 +141,6 @@ function startMockServer(): Promise<{ server: Server; port: number }> {
   });
 }
 
-class RestNotionTransport implements NotionTransport {
-  constructor(private readonly baseUrl: string) {}
-
-  async callTool(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
-    let url: string;
-    let method = "GET";
-    if (name === "API-post-search") {
-      url = `${this.baseUrl}/search`;
-      method = "POST";
-    } else if (name === "API-retrieve-a-page") {
-      url = `${this.baseUrl}/pages/${String(args.page_id)}`;
-    } else if (name === "API-retrieve-block-children") {
-      url = `${this.baseUrl}/blocks/${String(args.block_id)}/children`;
-    } else {
-      throw new Error(`unsupported tool: ${name}`);
-    }
-    const response = await fetch(url, { method });
-    if (!response.ok) throw new Error(`mock notion: ${String(response.status)} for ${url}`);
-    return (await response.json()) as Record<string, unknown>;
-  }
-}
-
-class MockNotionResource implements Resource {
-  readonly kind: string = ResourceName.NOTION;
-  readonly isRemote: boolean = true;
-  readonly indexTtl: number = 600;
-  readonly prompt: string = NOTION_PROMPT;
-  readonly writePrompt: string = NOTION_WRITE_PROMPT;
-  readonly accessor: NotionAccessor;
-  readonly index: IndexCacheStore;
-
-  constructor(transport: NotionTransport) {
-    this.accessor = new NotionAccessor(transport);
-    this.index = new RAMIndexCacheStore({ ttl: this.indexTtl });
-  }
-
-  open(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  close(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  commands(): readonly RegisteredCommand[] {
-    return NOTION_COMMANDS;
-  }
-
-  ops(): readonly RegisteredOp[] {
-    return NOTION_VFS_OPS;
-  }
-
-  readFile(p: PathSpec): Promise<Uint8Array> {
-    return notionRead(this.accessor, p, this.index);
-  }
-
-  readdir(p: PathSpec): Promise<string[]> {
-    return notionReaddir(this.accessor, p, this.index);
-  }
-
-  stat(p: PathSpec): Promise<FileStat> {
-    return notionStat(this.accessor, p, this.index);
-  }
-
-  async fingerprint(p: PathSpec): Promise<string | null> {
-    const lookup = await this.index.get(p.original);
-    return lookup.entry?.remoteTime ?? null;
-  }
-
-  glob(paths: readonly PathSpec[], prefix = ""): Promise<PathSpec[]> {
-    const effective =
-      prefix !== ""
-        ? paths.map((p) =>
-            p.prefix !== ""
-              ? p
-              : new PathSpec({
-                  original: p.original,
-                  directory: p.directory,
-                  ...(p.pattern !== null ? { pattern: p.pattern } : {}),
-                  resolved: p.resolved,
-                  prefix,
-                }),
-          )
-        : paths;
-    return resolveNotionGlob(this.accessor, effective, this.index);
-  }
-
-  getState(): Promise<{ type: string }> {
-    return Promise.resolve({ type: this.kind });
-  }
-
-  loadState(): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
 const CASES: ReadonlyArray<readonly [string, string]> = [
   ["ls_root", `ls ${MOUNT}/`],
   ["ls_pages", `ls ${MOUNT}/pages/`],
@@ -282,7 +166,10 @@ async function run(ws: Workspace, name: string, cmd: string): Promise<void> {
 
 async function main(): Promise<void> {
   const { server, port } = await startMockServer();
-  const resource = new MockNotionResource(new RestNotionTransport(`http://127.0.0.1:${String(port)}/v1`));
+  const resource = new NotionResource({
+    apiKey: "integ-test",
+    baseUrl: `http://127.0.0.1:${String(port)}/v1`,
+  });
   const ws = new Workspace({ [MOUNT]: resource }, { mode: MountMode.READ });
   try {
     for (const [name, cmd] of CASES) {
