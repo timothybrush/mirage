@@ -16,6 +16,7 @@ import { IOResult, materialize, type ByteSource } from '../../../io/types.ts'
 import type { PathSpec } from '../../../types.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
 import { resolveSource } from '../utils/stream.ts'
+import { formatRecords } from '../utils/output.ts'
 
 const ENC = new TextEncoder()
 const DEC = new TextDecoder('utf-8', { fatal: false })
@@ -122,7 +123,7 @@ export async function wcGeneric(
       else if (cFlag || mFlag) rows.push({ values: [totalBytes], label: 'total' })
       else rows.push({ values: [totalLines, totalWords, totalBytes], label: 'total' })
     }
-    const out: ByteSource = ENC.encode(formatWcLines(rows).join('\n'))
+    const out: ByteSource = formatRecords(formatWcLines(rows))
     return [out, new IOResult()]
   }
   let source: AsyncIterable<Uint8Array>

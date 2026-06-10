@@ -21,10 +21,9 @@ import { type ByteSource, IOResult } from '../../../io/types.ts'
 import { type PathSpec, ResourceName } from '../../../types.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
 import { specOf } from '../../spec/builtins.ts'
+import { formatRecords } from '../utils/output.ts'
 import { formatWcLines, wcGeneric, type WcRow } from '../generic/wc.ts'
 import { fileReadProvision } from './_provision.ts'
-
-const ENC = new TextEncoder()
 
 function rowsScope(p: PathSpec): { schema: string; entity: string } | null {
   const scope = detectScope(p)
@@ -59,7 +58,7 @@ async function wcCommand(
       total += count
     }
     if (resolved.length > 1) rows.push({ values: [total], label: 'total' })
-    const out: ByteSource = ENC.encode(formatWcLines(rows).join('\n'))
+    const out: ByteSource = formatRecords(formatWcLines(rows))
     return [out, new IOResult()]
   }
   return wcGeneric(resolved, texts, opts, (p) => readStream(accessor, p, opts.index ?? undefined))
