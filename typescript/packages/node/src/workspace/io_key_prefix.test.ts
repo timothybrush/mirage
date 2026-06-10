@@ -44,6 +44,9 @@ describe('io key prefix convention', () => {
     ['tee /data/t.txt > /dev/null', 'x\ny\n'],
     ['csplit -f /data/cs_ /data/seed.txt 2', null],
     ['cp /data/seed.txt /data/copy.txt', null],
+    ['grep x /data/seed.txt > /data/red.txt', null],
+    ['cat /data/seed.txt >> /data/app.txt', null],
+    ['cat /data/seed.txt | tee /data/piped.txt > /dev/null', null],
   ])('records mount-relative keys for %s', async (cmd, stdin) => {
     const ws = new Workspace({ '/data': new RAMResource() }, { mode: MountMode.WRITE })
     await ws.execute('tee /data/seed.txt > /dev/null', {

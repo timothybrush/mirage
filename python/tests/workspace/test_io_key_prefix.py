@@ -87,6 +87,11 @@ def _assert_single_prefix(captured: list) -> None:
     ("csplit -f /data/cs_ /data/seed.txt 2", None),
     ("unzip /data/a.zip -d /data/exout", None),
     ("cp /data/seed.txt /data/copy.txt", None),
+    ("grep x /data/seed.txt > /data/red.txt", None),
+    ("cat /data/seed.txt >> /data/app.txt", None),
+    ("cat /data/seed.txt | tee /data/piped.txt > /dev/null", None),
+    ("sed s/x/z/ /data/seed.txt > /data/s1.txt && cat /data/s1.txt"
+     " > /data/s2.txt", None),
 ])
 def test_ram_io_keys_single_prefixed(cmd, stdin):
     ws = Workspace({"/data": RAMResource()}, mode=MountMode.WRITE)
@@ -132,6 +137,24 @@ def test_s3_io_keys_single_prefixed(s3_endpoint):
             result = await ws.execute(cmd)
             assert result.exit_code == 0, await result.stderr_str()
         _assert_single_prefix(captured)
+        await ws.close()
+
+    asyncio.run(run())
+
+
+def test_s3_redirect_write_invalidates_listed_dir(s3_endpoint):
+    ws = _s3_workspace(s3_endpoint, "key-redirect-test")
+
+    async def run():
+        await ws.execute("tee /data/a.txt > /dev/null", stdin=b"x\ny\n")
+        await ws.execute("ls -1 /data/")
+        await ws.execute("grep x /data/a.txt > /data/red.txt")
+        await ws.execute("cat /data/a.txt | tee /data/piped.txt > /dev/null")
+        listing = await (await ws.execute("ls -1 /data/")).stdout_str()
+        assert "red.txt" in listing
+        assert "piped.txt" in listing
+        back = await ws.execute("cat /data/red.txt")
+        assert await back.stdout_str() == "x\n"
         await ws.close()
 
     asyncio.run(run())
