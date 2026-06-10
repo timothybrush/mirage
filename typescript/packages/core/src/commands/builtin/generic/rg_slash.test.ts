@@ -72,7 +72,7 @@ const s3Readdir = (p: PathSpec): Promise<string[]> => {
 }
 
 async function* stream(p: PathSpec): AsyncIterable<Uint8Array> {
-  const content = FILES[key(p)]
+  const content = await Promise.resolve(FILES[key(p)])
   if (content === undefined) throw new Error(`ENOENT: ${p.original}`)
   yield ENC.encode(content)
 }
