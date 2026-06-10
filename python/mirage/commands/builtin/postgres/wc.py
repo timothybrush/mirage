@@ -23,8 +23,10 @@ from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.builtin.utils.stream import _read_stdin_async
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
+from mirage.core.postgres import _client
 from mirage.core.postgres.glob import resolve_glob
 from mirage.core.postgres.read import read as postgres_read
+from mirage.core.postgres.scope import detect_scope
 from mirage.io.types import ByteSource, IOResult
 from mirage.provision.types import ProvisionResult
 from mirage.types import PathSpec
@@ -58,6 +60,24 @@ async def wc(
 ) -> tuple[ByteSource | None, IOResult]:
     if paths:
         paths = await resolve_glob(accessor, paths, index)
+        # Line counts on tables/views come from a server-side COUNT(*)
+        # instead of reading every row. -l only (default prints words and
+        # bytes too, which needs the content).
+        count_only = args_l and not (w or c or m or L)
+        scopes = [detect_scope(p) for p in paths]
+        if count_only and all(s.level == "entity_rows" for s in scopes):
+            counted: list[str] = []
+            total = 0
+            pool = await accessor.pool()
+            async with pool.acquire() as conn:
+                for p, scope in zip(paths, scopes):
+                    count = await _client.count_rows(conn, scope.schema,
+                                                     scope.entity)
+                    counted.append(f"{count}\t{p.original}")
+                    total += count
+            if len(paths) > 1:
+                counted.append(f"{total}\ttotal")
+            return format_records(counted), IOResult()
         outputs: list[str] = []
         totals = WCCounts()
         for p in paths:

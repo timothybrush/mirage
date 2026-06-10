@@ -16,7 +16,11 @@ from collections.abc import AsyncIterator
 
 from mirage.accessor.lancedb import LanceDBAccessor
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.generic.wc import WCCounts, format_wc
+from mirage.commands.builtin.generic.wc import wc as generic_wc
 from mirage.commands.builtin.lancedb._provision import metadata_provision
+from mirage.commands.builtin.utils.output import format_records
+from mirage.commands.builtin.utils.stream import _read_stdin_async
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
 from mirage.core.lancedb.glob import resolve_glob
@@ -36,14 +40,6 @@ async def wc_provision(
         p.original if isinstance(p, PathSpec) else p for p in paths))
 
 
-def _count(data: bytes, args_l: bool, c: bool, w: bool) -> int:
-    if c:
-        return len(data)
-    if w:
-        return len(data.split())
-    return data.count(b"\n")
-
-
 @command("wc", resource="lancedb", spec=SPECS["wc"], provision=wc_provision)
 async def wc(
     accessor: LanceDBAccessor,
@@ -58,11 +54,35 @@ async def wc(
     index: IndexCacheStore = None,
     **_extra: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    if not paths:
+    if paths:
+        paths = await resolve_glob(accessor, paths, index)
+        outputs: list[str] = []
+        totals = WCCounts()
+        for p in paths:
+            data = await lancedb_read(accessor, p, index)
+            counts = await generic_wc(data)
+            outputs.append(
+                format_wc(counts,
+                          args_l=args_l,
+                          w=w,
+                          c=c,
+                          m=m,
+                          L=L,
+                          label=p.original))
+            totals.merge(counts)
+        if len(paths) > 1:
+            outputs.append(
+                format_wc(totals,
+                          args_l=args_l,
+                          w=w,
+                          c=c,
+                          m=m,
+                          L=L,
+                          label="total"))
+        return format_records(outputs), IOResult()
+    data = await _read_stdin_async(stdin)
+    if data is None:
         raise ValueError("wc: missing operand")
-    paths = await resolve_glob(accessor, paths, index)
-    lines: list[str] = []
-    for p in paths:
-        data = await lancedb_read(accessor, p, index)
-        lines.append(f"{_count(data, args_l, c, w)} {p.original}")
-    return ("\n".join(lines) + "\n").encode(), IOResult()
+    counts = await generic_wc(data)
+    return format_wc(counts, args_l=args_l, w=w, c=c, m=m,
+                     L=L).encode() + b"\n", IOResult()
