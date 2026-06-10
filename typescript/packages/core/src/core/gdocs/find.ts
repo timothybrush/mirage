@@ -16,7 +16,7 @@ import type { GDocsAccessor } from '../../accessor/gdocs.ts'
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import type { FindOptions } from '../../resource/base.ts'
 import type { PathSpec } from '../../types.ts'
-import { walkFind } from '../google/find.ts'
+import { walkFind } from '../generic/find.ts'
 import { isDirName, readdir } from './readdir.ts'
 import { stat } from './stat.ts'
 
