@@ -92,7 +92,7 @@ const BLOCKS: Record<string, Json[]> = {
 function startMockServer(): Promise<{ server: Server; port: number }> {
   const server = createServer((req, res) => {
     const path = (req.url ?? "").split("?")[0] ?? "";
-    const parts = path.replace(/^\/+|\/+$/g, "").split("/");
+    const parts = path.split("/").filter((part) => part !== "");
     const sendJson = (payload: unknown): void => {
       const body = JSON.stringify(payload);
       res.writeHead(200, { "Content-Type": "application/json" });

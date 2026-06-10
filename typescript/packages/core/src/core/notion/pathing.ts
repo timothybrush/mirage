@@ -21,7 +21,8 @@ export function sanitizeName(name: string): string {
   let cleaned = name.replace(UNSAFE_CHARS, '_')
   cleaned = cleaned.replaceAll(' ', '_')
   cleaned = cleaned.replace(MULTI_UNDERSCORE, '_')
-  cleaned = cleaned.replace(/^_+/, '').replace(/_+$/, '')
+  if (cleaned.startsWith('_')) cleaned = cleaned.slice(1)
+  if (cleaned.endsWith('_')) cleaned = cleaned.slice(0, -1)
   if (cleaned.length > MAX_LEN) cleaned = cleaned.slice(0, MAX_LEN)
   return cleaned
 }

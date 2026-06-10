@@ -14,6 +14,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { FileStat, FileType, PathSpec } from '../../types.ts'
+import { stripSlash } from '../../util/slash.ts'
 import type { NotionStatAccessor } from './stat.ts'
 
 const DIRS = new Set(['/db', '/db/sub'])
@@ -27,7 +28,7 @@ const CHILDREN: Record<string, string[]> = {
 }
 
 function normalize(p: PathSpec): string {
-  const stripped = p.original.replace(/^\/+|\/+$/g, '')
+  const stripped = stripSlash(p.original)
   return stripped !== '' ? `/${stripped}` : '/'
 }
 

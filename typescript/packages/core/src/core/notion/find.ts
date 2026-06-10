@@ -18,6 +18,7 @@ import { type FileStat, FileType, PathSpec } from '../../types.ts'
 import type { NotionStatAccessor } from './stat.ts'
 import { readdir } from './readdir.ts'
 import { stat } from './stat.ts'
+import { stripSlash } from '../../util/slash.ts'
 
 function fnmatch(name: string, pattern: string): boolean {
   const re = pattern
@@ -53,7 +54,7 @@ export async function find(
   options: FindOptions = {},
   index?: IndexCacheStore,
 ): Promise<string[]> {
-  const stripped = path.stripPrefix.replace(/^\/+|\/+$/g, '')
+  const stripped = stripSlash(path.stripPrefix)
   const base = stripped !== '' ? `/${stripped}` : '/'
   const baseDepth = base === '/' ? 0 : (base.match(/\//g) ?? []).length
   const collected: [string, FileStat][] = []
@@ -64,7 +65,7 @@ export async function find(
     if (path.prefix !== '' && rel.startsWith(path.prefix)) {
       rel = rel.slice(path.prefix.length) || '/'
     }
-    const relStripped = rel.replace(/^\/+|\/+$/g, '')
+    const relStripped = stripSlash(rel)
     rel = relStripped !== '' ? `/${relStripped}` : '/'
     const isDir = fileStat.type === FileType.DIRECTORY
     if (options.type === 'f' && isDir) continue
