@@ -32,6 +32,7 @@ export interface GrepBytesOptions {
   fixedString?: boolean
   onlyMatching?: boolean
   maxCount?: number | null
+  showFilename?: boolean
 }
 
 function splitLines(text: string): string[] {
@@ -57,8 +58,14 @@ export async function grepBytes(
   const onlyMatching = options.onlyMatching ?? false
   const maxCount = options.maxCount ?? null
 
+  const showFilename = options.showFilename ?? true
+
   const regex = compilePattern(pattern, ignoreCase, fixedString, wholeWord)
   const targets = await targetSlugs(accessor, paths, index)
+  // Match generic grep: a single explicit file prints bare lines;
+  // multiple targets always carry the filename prefix.
+  const prefixed = showFilename || targets.size > 1
+  const mountPrefix = paths.length > 0 ? (paths[0]?.prefix ?? '') : ''
   const matchedSlugs = await coarseFilterSlugs(accessor, pattern, targets, {
     ignoreCase,
     invert,
@@ -73,7 +80,7 @@ export async function grepBytes(
   for (const slug of matchedSlugs) {
     const content = await fetchPageChunks(accessor, slug)
     const path = slugToPath.get(slug) ?? '/' + slug
-    reads[path] = ENC.encode(content)
+    reads[PathSpec.fromStrPath(path, mountPrefix).stripPrefix] = ENC.encode(content)
     const hits = grepLines(path, splitLines(content), regex, {
       invert,
       lineNumbers,
@@ -83,11 +90,11 @@ export async function grepBytes(
       maxCount,
     })
     if (countOnly) {
-      if (hits.length > 0) lines.push(`${path}:${hits[0] ?? ''}`)
+      if (hits.length > 0) lines.push(prefixed ? `${path}:${hits[0] ?? ''}` : (hits[0] ?? ''))
     } else if (filesOnly) {
       lines.push(...hits)
     } else {
-      lines.push(...hits.map((hit) => `${path}:${hit}`))
+      lines.push(...(prefixed ? hits.map((hit) => `${path}:${hit}`) : hits))
     }
   }
   return [ENC.encode(lines.join('\n')), reads]

@@ -54,6 +54,7 @@ async function grepCommand(
     fixedString: opts.flags.F === true,
     onlyMatching: opts.flags.o === true,
     maxCount: typeof opts.flags.m === 'string' ? Number.parseInt(opts.flags.m, 10) : null,
+    showFilename: opts.flags.r === true || opts.flags.R === true || resolved.length > 1,
   })
   const io = new IOResult({
     reads,

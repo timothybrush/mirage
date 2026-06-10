@@ -54,7 +54,8 @@ async def grep(
         whole_word=w,
         fixed_string=F,
         only_matching=o,
-        max_count=int(m) if m is not None else None)
+        max_count=int(m) if m is not None else None,
+        show_filename=r or R or len(paths) > 1)
     io = IOResult(reads=reads, cache=list(reads), exit_code=0 if output else 1)
     if q:
         return b"", io

@@ -21,33 +21,41 @@ async def grep_bytes(
     fixed_string: bool = False,
     only_matching: bool = False,
     max_count: int | None = None,
+    show_filename: bool = True,
 ) -> tuple[bytes, dict[str, bytes]]:
     regex = compile_pattern(pattern, ignore_case, fixed_string, whole_word)
     targets = await target_slugs(accessor, paths, index)
+    # Match generic grep: a single explicit file prints bare lines;
+    # multiple targets always carry the filename prefix.
+    prefixed = show_filename or len(targets) > 1
+    mount_prefix = paths[0].prefix if paths else ""
+    lines: list[str] = []
+    reads: dict[str, bytes] = {}
+    slug_to_path = {slug: path for path, slug in targets.items()}
     matched_slugs = await coarse_filter_slugs(accessor,
                                               pattern,
                                               targets,
                                               ignore_case=ignore_case,
                                               invert=invert,
                                               fixed_string=fixed_string)
-    lines: list[str] = []
-    reads: dict[str, bytes] = {}
-    slug_to_path = {slug: path for path, slug in targets.items()}
     for slug in matched_slugs:
         content = await fetch_page_chunks(accessor, slug)
         path = slug_to_path.get(slug, "/" + slug)
         data = content.encode()
-        reads[path] = data
+        reads[PathSpec.from_str_path(path, mount_prefix).strip_prefix] = data
         hits = grep_lines(path, split_lines(content), regex, invert,
                           line_numbers, count_only, files_only, only_matching,
                           max_count)
         if count_only:
             if hits:
-                lines.append(f"{path}:{hits[0]}")
+                lines.append(f"{path}:{hits[0]}" if prefixed else hits[0])
         elif files_only:
             lines.extend(hits)
         else:
-            lines.extend(f"{path}:{hit}" for hit in hits)
+            if prefixed:
+                lines.extend(f"{path}:{hit}" for hit in hits)
+            else:
+                lines.extend(hits)
     return "\n".join(lines).encode(), reads
 
 
