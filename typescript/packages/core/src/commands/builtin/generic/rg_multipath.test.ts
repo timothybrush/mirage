@@ -74,6 +74,7 @@ const readdir = (p: PathSpec): Promise<string[]> => {
 }
 
 async function* stream(p: PathSpec): AsyncIterable<Uint8Array> {
+  await Promise.resolve()
   const content = FILES[key(p)]
   if (content === undefined) throw new Error(`ENOENT: ${p.original}`)
   yield ENC.encode(content)
