@@ -384,7 +384,7 @@ text
 === stat_size ===
 24
 === stat_name ===
-a.txt
+/data/a.txt
 === gzip_gunzip_pipe ===
 hello
 world
@@ -1311,7 +1311,7 @@ exit=0
 14
 === nl_pin_stat ===
 exit=0
-6
+12
 === nl_pin_file ===
 exit=0
 18
