@@ -283,6 +283,23 @@ describe('parseCommand — repeatable value flags accumulate newline-joined', ()
     expect(p.flags['-m']).toBe('2')
   })
 
+  it('cluster into a repeatable flag accumulates', () => {
+    const p = parseCommand(specOf('grep'), ['-ne', 'foo', '-e', 'bar', '/a.txt'], '/')
+    expect(p.flags['-n']).toBe(true)
+    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.paths()).toEqual(['/a.txt'])
+  })
+
+  it('long =value and separate forms of a repeatable flag accumulate', () => {
+    const spec = new CommandSpec({
+      options: [new Option({ long: '--tag', valueKind: OperandKind.TEXT, repeatable: true })],
+      rest: new Operand({ kind: OperandKind.PATH }),
+    })
+    const p = parseCommand(spec, ['--tag=a', '--tag', 'b', '/x'], '/')
+    expect(p.flags['--tag']).toBe('a\nb')
+    expect(p.paths()).toEqual(['/x'])
+  })
+
   it('accumulates repeated -e for rg and frees the positional slot', () => {
     const p = parseCommand(specOf('rg'), ['-e', 'foo', '-e', 'bar', '/x'], '/')
     expect(p.flags['-e']).toBe('foo\nbar')

@@ -197,3 +197,23 @@ def test_known_flags_produce_no_warnings():
 def test_find_multichar_short_flag_still_works():
     parsed = parse_command(SPECS["find"], ["/data", "-name", "*.txt"], "/")
     assert parsed.flags["-name"] == "*.txt"
+
+
+def test_cluster_into_repeatable_flag_accumulates():
+    parsed = parse_command(SPECS["grep"],
+                           ["-ne", "foo", "-e", "bar", "/a.txt"], "/")
+    assert parsed.flags["-n"] is True
+    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.paths() == ["/a.txt"]
+
+
+def test_long_equals_and_separate_repeatable_accumulate():
+    spec = CommandSpec(
+        options=(Option(long="--tag",
+                        value_kind=OperandKind.TEXT,
+                        repeatable=True), ),
+        rest=Operand(kind=OperandKind.PATH),
+    )
+    parsed = parse_command(spec, ["--tag=a", "--tag", "b", "/x"], "/")
+    assert parsed.flags["--tag"] == "a\nb"
+    assert parsed.paths() == ["/x"]
