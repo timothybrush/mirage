@@ -48,6 +48,8 @@ async def read_stream(
     virtual_key = prefix + "/" + key if prefix else "/" + key
     result = await index.get(virtual_key)
     if result.entry is None:
+        # cold index: list the parent directory to populate the entry,
+        # then retry
         parent_key = posixpath.dirname(virtual_key) or "/"
         if parent_key != virtual_key:
             parent_path = PathSpec.from_str_path(parent_key, prefix=prefix)
@@ -55,6 +57,7 @@ async def read_stream(
                 await readdir(accessor, parent_path, index)
                 result = await index.get(virtual_key)
             except Exception:
+                # parent refresh failed; fall through to FileNotFoundError
                 pass
         if result.entry is None:
             raise FileNotFoundError(path)
