@@ -46,3 +46,34 @@ async def test_rg_repeated_dash_e_matches_any_pattern(workspace):
     assert "orange line" in out
     assert "plain line" in out
     assert "last line" not in out
+
+
+@pytest.mark.asyncio
+async def test_rg_dash_f_reads_patterns_from_file(workspace):
+    await workspace.ops.mkdir("/data")
+    await workspace.ops.write("/data/a.txt",
+                              b"orange line\nplain line\nlast line\n")
+    await workspace.ops.write("/data/pats.txt", b"orange\nlast\n")
+
+    io = await workspace.execute("rg -f /data/pats.txt /data/a.txt",
+                                 session_id="default")
+    assert io.exit_code == 0
+    out = (io.stdout or b"").decode()
+    assert "orange line" in out
+    assert "last line" in out
+    assert "plain line" not in out
+
+
+@pytest.mark.asyncio
+async def test_rg_dash_e_and_dash_f_union(workspace):
+    await workspace.ops.mkdir("/data")
+    await workspace.ops.write("/data/a.txt",
+                              b"orange line\nplain line\nlast line\n")
+    await workspace.ops.write("/data/pats.txt", b"last\n")
+
+    io = await workspace.execute("rg -e plain -f /data/pats.txt /data/a.txt",
+                                 session_id="default")
+    assert io.exit_code == 0
+    out = (io.stdout or b"").decode()
+    assert "plain line" in out
+    assert "last line" in out

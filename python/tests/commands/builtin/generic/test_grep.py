@@ -90,7 +90,7 @@ async def test_grep_stdin_basic():
     readdir, stat, rb, rs = _make_backend({})
     output, io = await grep(
         [],
-        pattern="apple",
+        ["apple"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
@@ -110,7 +110,7 @@ async def test_grep_file_basic():
     })
     output, io = await grep(
         [_spec("/a.txt")],
-        pattern="ap",
+        ["ap"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
@@ -127,12 +127,12 @@ async def test_grep_ignore_case():
     readdir, stat, rb, rs = _make_backend({"/a.txt": b"Apple\nBANANA\n"})
     output, _ = await grep(
         [_spec("/a.txt")],
-        pattern="apple",
+        ["apple"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        ignore_case=True,
+        flags={"i": True},
     )
     decoded = (await _drain_async(output)).decode()
     assert "Apple" in decoded
@@ -144,12 +144,12 @@ async def test_grep_invert():
         {"/a.txt": b"apple\nbanana\ncherry\n"})
     output, _ = await grep(
         [_spec("/a.txt")],
-        pattern="banana",
+        ["banana"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        invert=True,
+        flags={"v": True},
     )
     decoded = (await _drain_async(output)).decode()
     assert "apple" in decoded
@@ -163,12 +163,12 @@ async def test_grep_count_only():
         {"/a.txt": b"apple\nbanana\napricot\n"})
     output, _ = await grep(
         [_spec("/a.txt")],
-        pattern="ap",
+        ["ap"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        count_only=True,
+        flags={"c": True},
     )
     decoded = (await _drain_async(output)).decode().strip()
     assert decoded == "2"
@@ -179,7 +179,7 @@ async def test_grep_no_match_returns_exit_1():
     readdir, stat, rb, rs = _make_backend({"/a.txt": b"hello\nworld\n"})
     output, io = await grep(
         [_spec("/a.txt")],
-        pattern="zzz",
+        ["zzz"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
@@ -198,12 +198,12 @@ async def test_grep_recursive_finds_files_in_subdirs():
     })
     output, io = await grep(
         [_spec("/dir")],
-        pattern="ap",
+        ["ap"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        recursive=True,
+        flags={"r": True},
     )
     decoded = (await _drain_async(output)).decode()
     assert "apple" in decoded
@@ -218,13 +218,15 @@ async def test_grep_recursive_single_file_prefixes_filename():
     })
     output, _ = await grep(
         [_spec("/log.txt")],
-        pattern="error",
+        ["error"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        recursive=True,
-        line_numbers=True,
+        flags={
+            "r": True,
+            "n": True
+        },
     )
     decoded = (await _drain_async(output)).decode()
     assert decoded == "/log.txt:2:error here\n/log.txt:4:error again\n"
@@ -238,13 +240,15 @@ async def test_grep_files_only_lists_matching_files():
     })
     output, _ = await grep(
         [_spec("/dir")],
-        pattern="apple",
+        ["apple"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=rs,
-        recursive=True,
-        files_only=True,
+        flags={
+            "r": True,
+            "args_l": True
+        },
     )
     decoded = (await _drain_async(output)).decode()
     assert "/dir/a.txt" in decoded
@@ -333,13 +337,15 @@ async def test_grep_recursive_files_only_mount_prefix():
                  resolved=True)
     output, _ = await grep(
         [p],
-        pattern="apple",
+        ["apple"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,
         read_stream=None,
-        recursive=True,
-        files_only=True,
+        flags={
+            "r": True,
+            "args_l": True
+        },
         index=object(),
     )
     decoded = (await _drain_async(output)).decode().strip()
@@ -359,7 +365,7 @@ async def test_grep_single_file_threads_index():
                  resolved=True)
     output, _ = await grep(
         [p],
-        pattern="apple",
+        ["apple"],
         readdir=readdir,
         stat=stat,
         read_bytes=rb,

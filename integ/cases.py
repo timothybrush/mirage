@@ -358,6 +358,8 @@ CASES: list[tuple[str, str]] = [
     ("du_max_depth_eq", "du --max-depth=1 /data/sub"),
     ("rg_e_flag", "rg -e world /data/a.txt"),
     ("rg_e_multi", "rg -e world -e bar /data/a.txt"),
+    ("rg_f_file", "rg -f /data/patterns.txt /data/a.txt"),
+    ("zgrep_f_pipe", "cat /data/a.txt | gzip | zgrep -f /data/patterns.txt"),
 
     # ----- paste advanced -----
     ("paste_s", "paste -s /data/b.txt"),

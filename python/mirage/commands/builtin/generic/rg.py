@@ -1,7 +1,9 @@
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import (AsyncIterator, Awaitable, Callable, Mapping,
+                             Sequence)
 from functools import partial
 
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.generic.grep import _int_flag, resolve_pattern
 from mirage.commands.builtin.grep_helper import (compile_pattern,
                                                  grep_count_has_matches,
                                                  grep_lines, grep_stream,
@@ -20,37 +22,31 @@ from mirage.types import FileStat, FileType, PathSpec
 
 async def rg(
     paths: list[PathSpec],
+    texts: Sequence[str] = (),
+    flags: Mapping[str, object] | None = None,
     *,
-    pattern: str,
     readdir: Callable[..., Awaitable[list[str]]],
     stat: Callable[[PathSpec], Awaitable[FileStat]],
     read_bytes: Callable[..., Awaitable[bytes]],
     read_stream: Callable[..., AsyncIterator[bytes]] | None,
     accessor: object = None,
     stdin: AsyncIterator[bytes] | bytes | None = None,
-    ignore_case: bool = False,
-    invert: bool = False,
-    line_numbers: bool = False,
-    count_only: bool = False,
-    files_only: bool = False,
-    whole_word: bool = False,
-    fixed_string: bool = False,
-    only_matching: bool = False,
-    max_count: int | None = None,
-    context_before: int = 0,
-    context_after: int = 0,
-    hidden: bool = False,
-    file_type: str | None = None,
-    glob_pattern: str | None = None,
     scope_check: Callable[..., Awaitable[str | None]] | None = None,
     index: IndexCacheStore | None = None,
 ) -> tuple[ByteSource | None, IOResult]:
     """Run ripgrep-style fallback search over backend paths or stdin.
 
+    Interprets the raw flag kwargs itself (TS rgGeneric parity), so backend
+    wrappers only wire paths, texts, flags, and backend I/O.
+
     Args:
         paths (list[PathSpec]): Backend paths to search. Empty paths consume
             stdin.
-        pattern (str): Pattern text from CLI arguments.
+        texts (Sequence[str]): positional TEXT operands (the pattern unless
+            -e/-f supplied it).
+        flags (Mapping[str, object] | None): raw flag kwargs from the
+            dispatcher (e, f, i, v, n, c, args_l, w, F, o, m, A, B, C,
+            hidden, type, glob).
         readdir (Callable[..., Awaitable[list[str]]]): Directory reader.
         stat (Callable[[PathSpec], Awaitable[FileStat]]): Backend stat reader.
         read_bytes (Callable[..., Awaitable[bytes]]): Whole-file reader.
@@ -59,20 +55,6 @@ async def rg(
         accessor (object): Backend accessor passed through wrapper helpers.
         stdin (AsyncIterator[bytes] | bytes | None): Input used when paths is
             empty.
-        ignore_case (bool): `-i`, case-insensitive matching.
-        invert (bool): `-v`, select non-matching lines.
-        line_numbers (bool): `-n`, prefix line numbers.
-        count_only (bool): `-c`, output counts and omit zero-count files.
-        files_only (bool): `-l`, output only matching file paths.
-        whole_word (bool): `-w`, match whole words.
-        fixed_string (bool): `-F`, treat pattern as a literal string.
-        only_matching (bool): `-o`, output only matched text.
-        max_count (int | None): `-m`, stop after this many matching lines.
-        context_before (int): `-B`, leading context lines.
-        context_after (int): `-A`, trailing context lines.
-        hidden (bool): Include hidden files while scanning directories.
-        file_type (str | None): `--type`, filter directory scan by file type.
-        glob_pattern (str | None): `--glob`, filter directory scan by glob.
         scope_check (Callable[..., Awaitable[str | None]] | None): Optional
             backend warning hook.
         index (IndexCacheStore | None): Optional cache index for wrapped
@@ -81,6 +63,32 @@ async def rg(
     Returns:
         tuple[ByteSource | None, IOResult]: Output stream and exit metadata.
     """
+    fl: Mapping[str, object] = flags or {}
+    pattern, never_match = await resolve_pattern(
+        texts, fl, read_bytes, accessor, index,
+        "rg: usage: rg [flags] pattern [path]")
+    ignore_case = fl.get("i") is True
+    invert = fl.get("v") is True
+    line_numbers = fl.get("n") is True
+    count_only = fl.get("c") is True
+    files_only = fl.get("args_l") is True
+    whole_word = fl.get("w") is True
+    fixed_string = fl.get("F") is True and not never_match
+    only_matching = fl.get("o") is True
+    hidden = fl.get("hidden") is True
+    ft = fl.get("type")
+    file_type = ft if isinstance(ft, str) else None
+    gp = fl.get("glob")
+    glob_pattern = gp if isinstance(gp, str) else None
+    max_count = _int_flag(fl.get("m"))
+    a_ctx = _int_flag(fl.get("A"))
+    b_ctx = _int_flag(fl.get("B"))
+    c_ctx = _int_flag(fl.get("C"))
+    context_after = a_ctx if a_ctx is not None else 0
+    context_before = b_ctx if b_ctx is not None else 0
+    if c_ctx is not None:
+        context_before = context_after = c_ctx
+
     if paths:
         mount_prefix = paths[0].prefix
         rd = partial(call_readdir,

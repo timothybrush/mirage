@@ -16,7 +16,7 @@ import { exitOnEmpty } from '../../../io/stream.ts'
 import { IOResult, materialize, type ByteSource } from '../../../io/types.ts'
 import { FileType, PathSpec, type FileStat } from '../../../types.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
-import { compilePattern, grepStream } from '../grep_helper.ts'
+import { NEVER_MATCH, compilePattern, grepStream, mergePatternList } from '../grep_helper.ts'
 import { rgFolderFiletype, rgFull } from '../rg_helper.ts'
 import { resolveSource } from '../utils/stream.ts'
 import { grepGeneric } from './grep.ts'
@@ -87,7 +87,29 @@ export async function rgGeneric(
   stream: Stream,
   scopeCheck?: ScopeCheck,
 ): Promise<CommandFnResult> {
-  const exprText = typeof opts.flags.e === 'string' ? opts.flags.e : texts[0]
+  let exprText: string | undefined = typeof opts.flags.e === 'string' ? opts.flags.e : texts[0]
+  let neverMatch = false
+  if (typeof opts.flags.f === 'string') {
+    // Repeatable -f carries newline-joined resolved paths; read each file.
+    for (const filePath of opts.flags.f.split('\n')) {
+      const patternSpec = PathSpec.fromStrPath(filePath, paths[0]?.prefix ?? opts.mountPrefix ?? '')
+      let fileData: Uint8Array
+      try {
+        fileData = await materialize(stream(patternSpec))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return [
+          null,
+          new IOResult({ exitCode: 2, stderr: ENC.encode(`rg: ${filePath}: ${msg}\n`) }),
+        ]
+      }
+      exprText = mergePatternList(exprText ?? null, fileData) ?? undefined
+    }
+    if (exprText === undefined) {
+      exprText = NEVER_MATCH
+      neverMatch = true
+    }
+  }
   if (exprText === undefined) {
     return [
       null,
@@ -95,6 +117,7 @@ export async function rgGeneric(
     ]
   }
   const flags = parseRgFlags(opts.flags)
+  if (neverMatch) flags.fixedString = false
   const [first] = paths
 
   if (first === undefined) {

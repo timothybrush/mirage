@@ -17,53 +17,28 @@ async def grep(
     accessor,
     paths: list[PathSpec],
     *texts: str,
-    r: bool = False,
-    R: bool = False,
-    i: bool = False,
-    args_i: bool = False,
-    v: bool = False,
-    n: bool = False,
-    c: bool = False,
-    args_l: bool = False,
-    w: bool = False,
-    F: bool = False,
-    E: bool = False,
-    o: bool = False,
-    m: str | None = None,
-    q: bool = False,
-    H: bool = False,
-    args_h: bool = False,
-    A: str | None = None,
-    B: str | None = None,
-    C: str | None = None,
-    e: str | None = None,
-    f: PathSpec | list[PathSpec] | None = None,
-    **_extra: object,
+    **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    index = _extra.get("index")
+    index = flags.get("index")
     paths = await resolve_glob(accessor, paths, index)
-    if e is not None:
-        pattern = e
-    elif texts:
-        pattern = texts[0]
-    elif f is not None:
-        pattern = None
-    else:
-        raise ValueError("grep: usage: grep [flags] pattern [path]")
+    e = flags.get("e")
+    pattern = e if isinstance(e, str) else (texts[0] if texts else None)
     files = paths
     show_filename = False
-    if paths:
+    if paths and pattern is not None:
         # Pushdown: expand the scope to files and let ChromaDB pre-filter
         # which documents can contain the pattern, so only candidate
         # documents are fetched. The generic grep owns flag handling and
-        # output formatting on the surviving files.
+        # output formatting on the surviving files. Skipped when only -f
+        # supplies patterns (they are read inside the generic).
         targets = await target_slugs(accessor, paths, index)
-        matched = set(await coarse_filter_slugs(accessor,
-                                                pattern,
-                                                targets,
-                                                ignore_case=i or args_i,
-                                                invert=v,
-                                                fixed_string=F))
+        matched = set(await
+                      coarse_filter_slugs(accessor,
+                                          pattern,
+                                          targets,
+                                          ignore_case=flags.get("i") is True,
+                                          invert=flags.get("v") is True,
+                                          fixed_string=flags.get("F") is True))
         prefix = paths[0].prefix
         files = [
             PathSpec.from_str_path(p, prefix) for p, slug in targets.items()
@@ -71,31 +46,20 @@ async def grep(
         ]
         if not files:
             return b"", IOResult(exit_code=1)
-        show_filename = r or R or len(paths) > 1 or len(targets) > 1
+        recursive = flags.get("r") is True or flags.get("R") is True
+        show_filename = recursive or len(paths) > 1 or len(targets) > 1
     return await generic_grep(
         files,
-        pattern=pattern,
-        pattern_file=f,
+        texts,
+        {
+            **flags, "r": False,
+            "R": False
+        },
         readdir=readdir,
         stat=stat_light,
         read_bytes=read_bytes,
         read_stream=partial(read_stream, index=index),
         accessor=accessor,
-        ignore_case=i or args_i,
-        invert=v,
-        line_numbers=n,
-        count_only=c,
-        files_only=args_l,
-        whole_word=w,
-        fixed_string=F,
-        only_matching=o,
-        quiet=q,
-        recursive=False,
-        max_count=int(m) if m is not None else None,
-        after_context=int(A) if A is not None else
-        (int(C) if C is not None else 0),
-        before_context=int(B) if B is not None else
-        (int(C) if C is not None else 0),
         show_filename=show_filename,
         index=index,
     )

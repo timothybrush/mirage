@@ -33,66 +33,23 @@ async def grep(
     paths: list[PathSpec],
     *texts: str,
     stdin: AsyncIterator[bytes] | bytes | None = None,
-    r: bool = False,
-    R: bool = False,
-    i: bool = False,
-    v: bool = False,
-    n: bool = False,
-    c: bool = False,
-    args_l: bool = False,
-    w: bool = False,
-    F: bool = False,
-    E: bool = False,
-    o: bool = False,
-    m: str | None = None,
-    q: bool = False,
-    H: bool = False,
-    args_h: bool = False,
-    A: str | None = None,
-    B: str | None = None,
-    C: str | None = None,
-    e: str | None = None,
-    f: PathSpec | list[PathSpec] | None = None,
     index: IndexCacheStore = None,
-    **_extra: object,
+    **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    if e is not None:
-        pattern = e
-    elif texts:
-        pattern = texts[0]
-    elif f is not None:
-        pattern = None
-    else:
-        raise ValueError("grep: usage: grep [flags] pattern [path]")
-    max_count = int(m) if m is not None else None
-    after_ctx = int(A) if A is not None else (int(C) if C is not None else 0)
-    before_ctx = int(B) if B is not None else (int(C) if C is not None else 0)
     resolved = await resolve_glob(accessor, paths, index) if paths else []
-    if (r or R) and any(is_cross_run_root(p) for p in resolved):
+    recursive = flags.get("r") is True or flags.get("R") is True
+    if recursive and any(is_cross_run_root(p) for p in resolved):
         raise ValueError("grep: recursive search across runs is disabled; "
                          "target a specific run (e.g. /ci/runs/<run>/jobs)")
     return await generic_grep(
         resolved,
-        pattern=pattern,
-        pattern_file=f,
+        texts,
+        flags,
         readdir=_readdir,
         stat=_stat,
         read_bytes=ci_read,
         read_stream=None,
         accessor=accessor,
         stdin=stdin,
-        ignore_case=i,
-        invert=v,
-        line_numbers=n,
-        count_only=c,
-        files_only=args_l,
-        whole_word=w,
-        fixed_string=F,
-        only_matching=o,
-        quiet=q,
-        recursive=r or R,
-        max_count=max_count,
-        after_context=after_ctx,
-        before_context=before_ctx,
         index=index,
     )

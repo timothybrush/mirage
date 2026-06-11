@@ -38,39 +38,21 @@ async def rg(
     accessor: GitHubAccessor,
     paths: list[PathSpec],
     *texts: str,
-    e: str | None = None,
     stdin: AsyncIterator[bytes] | bytes | None = None,
-    i: bool = False,
-    v: bool = False,
-    n: bool = False,
-    c: bool = False,
-    args_l: bool = False,
-    w: bool = False,
-    F: bool = False,
-    o: bool = False,
-    m: str | None = None,
-    A: str | None = None,
-    B: str | None = None,
-    C: str | None = None,
-    hidden: bool = False,
-    type: str | None = None,
-    glob: str | None = None,
     index: IndexCacheStore = None,
-    **_extra: object,
+    **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    if e is None and not texts:
+    e = flags.get("e")
+    if not isinstance(e, str) and not texts:
         raise ValueError("rg: usage: rg [flags] pattern [path]")
-    pattern_str = e if e is not None else texts[0]
-    max_count = int(m) if m is not None else None
-    after_ctx = int(A) if A is not None else (int(C) if C is not None else 0)
-    before_ctx = int(B) if B is not None else (int(C) if C is not None else 0)
+    pattern_str = e if isinstance(e, str) else texts[0]
 
     if paths and index is None:
         return b"", IOResult(exit_code=1)
     if paths:
         key = scope_relative_key(paths[0])
         file_count = count_scope_files(index._entries, key)
-        pt = classify_pattern(pattern_str, F)
+        pt = classify_pattern(pattern_str, flags.get("F") is True)
         use_search = (should_use_search(
             is_regex=(pt == PatternType.REGEX),
             recursive=True,
@@ -92,26 +74,13 @@ async def rg(
 
     return await generic_rg(
         paths,
-        pattern=pattern_str,
+        texts,
+        flags,
         readdir=_readdir,
         stat=_stat,
         read_bytes=github_read,
         read_stream=None,
         accessor=accessor,
         stdin=stdin,
-        ignore_case=i,
-        invert=v,
-        line_numbers=n,
-        count_only=c,
-        files_only=args_l,
-        whole_word=w,
-        fixed_string=F,
-        only_matching=o,
-        max_count=max_count,
-        context_before=before_ctx,
-        context_after=after_ctx,
-        hidden=hidden,
-        file_type=type,
-        glob_pattern=glob,
         index=index,
     )

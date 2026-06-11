@@ -123,6 +123,26 @@ describe('grep -e pattern flag', () => {
     await ws.close()
   })
 
+  it('rg -f reads patterns from a workspace file', async () => {
+    const ws = await makeWs()
+    const io = await ws.execute('rg -f /data/pats.txt /data/a.txt')
+    expect(io.exitCode).toBe(0)
+    expect(stdoutStr(io)).toContain('orange line')
+    expect(stdoutStr(io)).toContain('last line')
+    expect(stdoutStr(io)).not.toContain('plain line')
+    await ws.close()
+  })
+
+  it('zgrep -f reads plain-text pattern files', async () => {
+    const ws = await makeWs()
+    const io = await ws.execute('cat /data/a.txt | gzip | tee /data/a.gz > /dev/null')
+    expect(io.exitCode).toBe(0)
+    const z = await ws.execute('zgrep -f /data/pats.txt /data/a.gz')
+    expect(z.exitCode).toBe(0)
+    expect(stdoutStr(z)).toBe('orange line\nlast line\n')
+    await ws.close()
+  })
+
   it('rg -e and repeated rg -e work like grep', async () => {
     const ws = await makeWs()
     const single = await ws.execute('rg -e orange /data/a.txt')

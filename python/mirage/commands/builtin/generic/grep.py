@@ -1,4 +1,5 @@
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import (AsyncIterator, Awaitable, Callable, Mapping,
+                             Sequence)
 from functools import partial
 
 from mirage.cache.index import IndexCacheStore
@@ -17,75 +18,45 @@ from mirage.io.types import ByteSource, IOResult
 from mirage.types import FileStat, FileType, PathSpec
 
 
-async def grep(
-    paths: list[PathSpec],
-    *,
-    pattern: str | None,
-    readdir: Callable[..., Awaitable[list[str]]],
-    stat: Callable[[PathSpec], Awaitable[FileStat]],
+def _int_flag(value: object) -> int | None:
+    return int(value) if isinstance(value, str) else None
+
+
+async def resolve_pattern(
+    texts: Sequence[str],
+    flags: Mapping[str, object],
     read_bytes: Callable[..., Awaitable[bytes]],
-    read_stream: Callable[..., AsyncIterator[bytes]] | None,
-    accessor: object = None,
-    stdin: AsyncIterator[bytes] | bytes | None = None,
-    pattern_file: PathSpec | list[PathSpec] | None = None,
-    ignore_case: bool = False,
-    invert: bool = False,
-    line_numbers: bool = False,
-    count_only: bool = False,
-    files_only: bool = False,
-    whole_word: bool = False,
-    fixed_string: bool = False,
-    only_matching: bool = False,
-    quiet: bool = False,
-    recursive: bool = False,
-    max_count: int | None = None,
-    after_context: int = 0,
-    before_context: int = 0,
-    scope_check: Callable[..., Awaitable[str | None]] | None = None,
-    show_filename: bool = False,
-    index: IndexCacheStore | None = None,
-) -> tuple[ByteSource | None, IOResult]:
-    """Run grep-style fallback search over backend paths or stdin.
+    accessor: object,
+    index: IndexCacheStore | None,
+    usage: str,
+) -> tuple[str, bool]:
+    """Resolve the search pattern from -e/positional/-f flag arguments.
 
     Args:
-        paths (list[PathSpec]): Backend paths to search. Empty paths consume
-            stdin.
-        pattern (str | None): Newline-separated pattern list from `-e` or the
-            positional argument, or None when only `-f` supplies patterns.
-        readdir (Callable[..., Awaitable[list[str]]]): Directory reader.
-        stat (Callable[[PathSpec], Awaitable[FileStat]]): Backend stat reader.
-        read_bytes (Callable[..., Awaitable[bytes]]): Whole-file reader.
-        read_stream (Callable[..., AsyncIterator[bytes]] | None): Optional
-            stream reader.
-        accessor (object): Backend accessor passed through wrapper helpers.
-        stdin (AsyncIterator[bytes] | bytes | None): Input used when paths is
-            empty.
-        pattern_file (PathSpec | list[PathSpec] | None): `-f`, file(s)
-            holding newline-separated patterns, read via the backend.
-        ignore_case (bool): `-i`, case-insensitive matching.
-        invert (bool): `-v`, select non-matching lines.
-        line_numbers (bool): `-n`, prefix line numbers.
-        count_only (bool): `-c`, output match counts.
-        files_only (bool): `-l`, output only matching file paths.
-        whole_word (bool): `-w`, match whole words.
-        fixed_string (bool): `-F`, treat pattern as a literal string.
-        only_matching (bool): `-o`, output only matched text.
-        quiet (bool): `-q`, suppress stdout and use exit status only.
-        recursive (bool): `-r`, descend into directories.
-        max_count (int | None): `-m`, stop after this many matching lines.
-        after_context (int): `-A`, trailing context lines.
-        before_context (int): `-B`, leading context lines.
-        scope_check (Callable[..., Awaitable[str | None]] | None): Optional
-            backend warning hook.
-        show_filename (bool): Force filename prefixes on a single path,
-            for callers that pre-expanded a multi-file scope.
-        index (IndexCacheStore | None): Optional cache index for wrapped
-            backend calls.
+        texts (Sequence[str]): positional TEXT operands.
+        flags (Mapping[str, object]): raw flag kwargs (TS-style record).
+        read_bytes (Callable[..., Awaitable[bytes]]): whole-file reader used
+            for -f pattern files.
+        accessor (object): backend accessor for read_bytes.
+        index (IndexCacheStore | None): optional cache index.
+        usage (str): usage error message when no pattern was supplied.
 
     Returns:
-        tuple[ByteSource | None, IOResult]: Output stream and exit metadata.
+        tuple[str, bool]: (newline-separated pattern list, never_match) where
+            never_match is True when -f supplied zero patterns (GNU: match
+            nothing; -F escaping must be skipped for the sentinel).
     """
-    if pattern_file is not None:
+    e = flags.get("e")
+    pattern: str | None
+    if isinstance(e, str):
+        pattern = e
+    elif texts:
+        pattern = texts[0]
+    else:
+        pattern = None
+
+    pattern_file = flags.get("f")
+    if isinstance(pattern_file, (PathSpec, list)):
         files = (pattern_file
                  if isinstance(pattern_file, list) else [pattern_file])
         for pf in files:
@@ -96,10 +67,78 @@ async def grep(
                                               prefix=pf.prefix)
             pattern = merge_pattern_list(pattern, file_data)
         if pattern is None:
-            pattern = NEVER_MATCH
-            fixed_string = False
+            return NEVER_MATCH, True
     if pattern is None:
-        raise ValueError("grep: usage: grep [flags] pattern [path]")
+        raise ValueError(usage)
+    return pattern, False
+
+
+async def grep(
+    paths: list[PathSpec],
+    texts: Sequence[str] = (),
+    flags: Mapping[str, object] | None = None,
+    *,
+    readdir: Callable[..., Awaitable[list[str]]],
+    stat: Callable[[PathSpec], Awaitable[FileStat]],
+    read_bytes: Callable[..., Awaitable[bytes]],
+    read_stream: Callable[..., AsyncIterator[bytes]] | None,
+    accessor: object = None,
+    stdin: AsyncIterator[bytes] | bytes | None = None,
+    scope_check: Callable[..., Awaitable[str | None]] | None = None,
+    show_filename: bool = False,
+    index: IndexCacheStore | None = None,
+) -> tuple[ByteSource | None, IOResult]:
+    """Run grep-style fallback search over backend paths or stdin.
+
+    Interprets the raw flag kwargs itself (TS grepGeneric parity), so
+    backend wrappers only wire paths, texts, flags, and backend I/O.
+
+    Args:
+        paths (list[PathSpec]): Backend paths to search. Empty paths consume
+            stdin.
+        texts (Sequence[str]): positional TEXT operands (the pattern unless
+            -e/-f supplied it).
+        flags (Mapping[str, object] | None): raw flag kwargs from the
+            dispatcher (e, f, i, v, n, c, args_l, w, F, o, q, r, R, m,
+            A, B, C).
+        readdir (Callable[..., Awaitable[list[str]]]): Directory reader.
+        stat (Callable[[PathSpec], Awaitable[FileStat]]): Backend stat reader.
+        read_bytes (Callable[..., Awaitable[bytes]]): Whole-file reader.
+        read_stream (Callable[..., AsyncIterator[bytes]] | None): Optional
+            stream reader.
+        accessor (object): Backend accessor passed through wrapper helpers.
+        stdin (AsyncIterator[bytes] | bytes | None): Input used when paths is
+            empty.
+        scope_check (Callable[..., Awaitable[str | None]] | None): Optional
+            backend warning hook.
+        show_filename (bool): Force filename prefixes on a single path,
+            for callers that pre-expanded a multi-file scope.
+        index (IndexCacheStore | None): Optional cache index for wrapped
+            backend calls.
+
+    Returns:
+        tuple[ByteSource | None, IOResult]: Output stream and exit metadata.
+    """
+    fl: Mapping[str, object] = flags or {}
+    pattern, never_match = await resolve_pattern(
+        texts, fl, read_bytes, accessor, index,
+        "grep: usage: grep [flags] pattern [path]")
+    ignore_case = fl.get("i") is True
+    invert = fl.get("v") is True
+    line_numbers = fl.get("n") is True
+    count_only = fl.get("c") is True
+    files_only = fl.get("args_l") is True
+    whole_word = fl.get("w") is True
+    fixed_string = fl.get("F") is True and not never_match
+    only_matching = fl.get("o") is True
+    quiet = fl.get("q") is True
+    recursive = fl.get("r") is True or fl.get("R") is True
+    max_count = _int_flag(fl.get("m"))
+    a_ctx = _int_flag(fl.get("A"))
+    b_ctx = _int_flag(fl.get("B"))
+    c_ctx = _int_flag(fl.get("C"))
+    after_context = a_ctx if a_ctx is not None else (c_ctx or 0)
+    before_context = b_ctx if b_ctx is not None else (c_ctx or 0)
 
     if paths:
         mount_prefix = paths[0].prefix
