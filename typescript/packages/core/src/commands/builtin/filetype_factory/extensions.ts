@@ -60,4 +60,8 @@ export type StatEntryFn<A extends Accessor = Accessor> = (
   accessor: A,
   path: PathSpec,
   index?: IndexCacheStore,
-) => Promise<{ readonly size: number | null; readonly modified: string | null; readonly name: string }>
+) => Promise<{
+  readonly size: number | null
+  readonly modified: string | null
+  readonly name: string
+}>
