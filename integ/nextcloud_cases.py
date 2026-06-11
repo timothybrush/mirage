@@ -22,8 +22,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cases import run_cases  # noqa: E402
 
 from mirage import MountMode, Workspace  # noqa: E402
-from mirage.resource.nextcloud import (NextcloudConfig,  # noqa: E402
-                                       NextcloudResource)
+from mirage.resource.nextcloud import NextcloudConfig  # noqa: E402
+from mirage.resource.nextcloud import NextcloudResource  # noqa: E402
 
 URL = os.environ.get(
     "NEXTCLOUD_URL",
