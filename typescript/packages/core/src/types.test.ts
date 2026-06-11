@@ -85,8 +85,8 @@ describe('ResourceName', () => {
     expect(ResourceName.QINGSTOR).toBe('qingstor')
   })
 
-  it('contains exactly 42 entries', () => {
-    expect(Object.keys(ResourceName)).toHaveLength(42)
+  it('contains exactly 45 entries', () => {
+    expect(Object.keys(ResourceName)).toHaveLength(45)
   })
 
   it('is frozen at runtime', () => {
