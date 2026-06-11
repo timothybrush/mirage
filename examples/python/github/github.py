@@ -231,7 +231,8 @@ async def main() -> None:
     r = await ws.execute("grep 'import' /github/python/mirage/*")
     out = (await r.stdout_str()).strip()
     err = (await r.stderr_str()).strip()
-    print(f"  exit={r.exit_code} matches: {len(out.splitlines()) if out else 0}")
+    print(
+        f"  exit={r.exit_code} matches: {len(out.splitlines()) if out else 0}")
     for line in err.splitlines()[:3]:
         print(f"  {line}")
     print()
