@@ -221,16 +221,15 @@ and `stat` on audio files.
 | MP3    | `.mp3`    | cat, head, tail, grep, stat |
 | OGG    | `.ogg`    | cat, head, tail, grep, stat |
 
-To enable, register audio commands manually:
+To enable, install the `audio` extra (`pip install "mirage-ai[audio]"`) and register audio commands manually:
 
 ```python
-from mirage.commands.audio import AUDIO_COMMANDS
-from mirage.commands.audio.utils import configure
+from mirage.commands.local_audio.ram import COMMANDS as RAM_AUDIO_COMMANDS
+from mirage.commands.local_audio.utils import configure
 
 configure(model_dir="path/to/sherpa-onnx-whisper-base")
 
-for cmd in AUDIO_COMMANDS:
-    ws.register(cmd)
+ws.mount("/data").register_fns(RAM_AUDIO_COMMANDS)
 ```
 
 ## Use Cases
