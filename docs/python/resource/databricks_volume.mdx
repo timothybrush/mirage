@@ -79,8 +79,8 @@ Reads: `readdir`, `stat`, `exists`, `read_bytes`, `read_stream`,
 `range_read`, and glob resolution. Writes: `write`, `create`, `mkdir`,
 `rmdir`, `unlink`, recursive `rm`, `cp`, and `mv`.
 
-`mv`/`cp` are non-atomic download + upload (the Files API has no server-side
-rename); moving a path onto itself is a no-op and never deletes the file.
+`mv`/`cp` are non-atomic download + upload — the Files API has no server-side
+rename.
 
 ## Shell Commands
 
