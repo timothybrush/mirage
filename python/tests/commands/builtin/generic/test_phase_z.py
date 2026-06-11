@@ -116,8 +116,9 @@ async def test_jq_missing_expression():
 @pytest.mark.asyncio
 async def test_jq_no_input():
     rb, _, rs, _, _ = _make_backend({})
-    with pytest.raises(ValueError, match="missing input"):
-        await jq([], ".x", read_bytes=rb, read_stream=rs)
+    out, io = await jq([], ".x", read_bytes=rb, read_stream=rs)
+    assert out is None
+    assert io.exit_code == 0
 
 
 @pytest.mark.asyncio

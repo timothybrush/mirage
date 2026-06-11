@@ -63,9 +63,7 @@ async function jqCommand(
   }
 
   const bytes = await readStdinAsync(opts.stdin)
-  if (bytes === null) {
-    return [null, new IOResult({ exitCode: 1, stderr: ENC.encode('jq: missing input\n') })]
-  }
+  if (bytes === null) return [null, new IOResult()]
   let data = parseJsonAuto(bytes)
   if (slurp && !Array.isArray(data)) data = [data]
   const result = await jqEval(data, expression.trim())

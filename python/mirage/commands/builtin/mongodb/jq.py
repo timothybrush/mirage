@@ -69,4 +69,4 @@ async def jq(
         result = jq_eval(data, expression.strip())
         spread = "[]" in expression
         return format_jq_output(result, r, c, spread), IOResult()
-    raise ValueError("jq: missing input")
+    return None, IOResult()
