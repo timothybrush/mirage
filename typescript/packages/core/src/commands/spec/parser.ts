@@ -164,7 +164,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
         } else if (lenientDashOperands) {
           rawArgs.push(tok)
         } else {
-          warnings.push(`unknown option '${tok}' ignored`)
+          warnings.push(`warning: unknown option '${tok}' ignored`)
         }
         i += 1
       }
@@ -232,7 +232,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
       if (lenientDashOperands || /^-\d+$/.test(tok)) {
         rawArgs.push(tok)
       } else {
-        warnings.push(`unknown option '${tok}' ignored`)
+        warnings.push(`warning: unknown option '${tok}' ignored`)
       }
       i += 1
       continue

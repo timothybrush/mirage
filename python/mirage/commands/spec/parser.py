@@ -161,7 +161,7 @@ def parse_command(
                 elif lenient_dash_operands:
                     raw_args.append(tok)
                 else:
-                    warnings.append(f"unknown option '{tok}' ignored")
+                    warnings.append(f"warning: unknown option '{tok}' ignored")
                 i += 1
             continue
 
@@ -223,7 +223,7 @@ def parse_command(
             if lenient_dash_operands or _NUMERIC_SHORT.match(tok):
                 raw_args.append(tok)
             else:
-                warnings.append(f"unknown option '{tok}' ignored")
+                warnings.append(f"warning: unknown option '{tok}' ignored")
             i += 1
             continue
 
