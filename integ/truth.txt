@@ -1311,9 +1311,9 @@ exit=1
 exit=1
 === csplit_no_input ===
 exit=0
-=== gzip_no_input_sha ===
+=== gzip_no_input_roundtrip ===
 exit=0
-abfbb86f9f5ddfbd9fc1a72c43ab384702ce8bae86b60f3324748485e235e61e  -
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  -
 === lazy_exit_grep_match ===
 exit=0
 hello

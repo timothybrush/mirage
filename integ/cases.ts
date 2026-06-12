@@ -433,7 +433,7 @@ export const EXIT_CODE_CASES: ReadonlyArray<readonly [string, string]> = [
   ["zcat_no_input", "zcat"],
   ["gzip_d_no_input", "gzip -d"],
   ["csplit_no_input", "csplit"],
-  ["gzip_no_input_sha", "gzip | sha256sum"],
+  ["gzip_no_input_roundtrip", "gzip | gunzip | sha256sum"],
   ["lazy_exit_grep_match", "grep hello /data/a.txt"],
   ["lazy_exit_grep_no_match", "grep zzz /data/a.txt"],
   ["cp_reject_multi_nondir", "cp /data/a.txt /data/b.txt /data/c.txt"],
