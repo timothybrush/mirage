@@ -413,6 +413,11 @@ class Mount:
                 p, PathSpec) else p for p in paths
         ]
 
+        # Attach this mount's prefix to path-shaped flag values so backend
+        # reads can strip it: a single PathSpec (e.g. awk -f, single grep -f)
+        # or a list of PathSpec (repeatable grep -f). Everything else (bools,
+        # strings, list[str] like repeated -e) is not a path and passes
+        # through unchanged.
         kw = {}
         for k, v in flag_kwargs.items():
             if isinstance(v, PathSpec):

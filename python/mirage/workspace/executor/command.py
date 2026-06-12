@@ -122,6 +122,13 @@ def _parse_flags(
 ) -> _ParsedCommand:
     """Parse flags from classified parts, recovering PathSpec for PATH values.
 
+    Args:
+        parts (list[str | PathSpec]): expanded command words after the
+            command name; path-classified words arrive as PathSpec.
+        mount (object): mount providing spec_for(cmd_name).
+        cmd_name (str): command name used to look up the spec.
+        cwd (str): current working directory for relative path resolution.
+
     Returns:
         _ParsedCommand: positional paths, positional texts, parsed flag dict
         (PATH flag values recovered to PathSpec, repeatable PATH flags to
