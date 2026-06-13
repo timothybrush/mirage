@@ -17,7 +17,7 @@ import { IndexEntry } from '../../cache/index/config.ts'
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import { PathSpec } from '../../types.ts'
 import { MIME_TO_EXT, listFiles } from '../google/drive.ts'
-import { rstripSlash, stripSlash } from '../../util/slash.ts'
+import { rstripSlash, stripSlash } from '../../utils/slash.ts'
 
 export function isDirName(child: string): boolean | null {
   // Cold listings mark folders with a trailing slash; warm index-cache

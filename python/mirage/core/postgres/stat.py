@@ -21,6 +21,7 @@ from mirage.cache.index import IndexCacheStore
 from mirage.core.postgres import _client
 from mirage.core.postgres.scope import detect_scope
 from mirage.types import FileStat, FileType, PathSpec
+from mirage.utils.errors import enoent
 
 
 async def stat(accessor: PostgresAccessor,
@@ -75,7 +76,7 @@ async def stat(accessor: PostgresAccessor,
         return await _rows_stat(accessor, scope.schema, scope.kind,
                                 scope.entity)
 
-    raise FileNotFoundError(raw)
+    raise enoent(path)
 
 
 async def _rows_stat(accessor: PostgresAccessor, schema: str, kind: str,

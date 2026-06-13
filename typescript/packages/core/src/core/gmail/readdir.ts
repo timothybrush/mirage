@@ -20,7 +20,8 @@ import { listLabels } from './labels.ts'
 import type { GmailMessageRaw } from './messages.ts'
 import { extractAttachments, extractHeader, getMessageRaw, listMessages } from './messages.ts'
 import { GoogleFileSuffix } from '../google/drive.ts'
-import { stripSlash } from '../../util/slash.ts'
+import { stripSlash } from '../../utils/slash.ts'
+import { enoent } from '../../utils/errors.ts'
 
 export function isDirName(child: string): boolean {
   // readdir emits only label/date dirs and rendered *.gmail.json files.
@@ -52,12 +53,6 @@ function dateFromInternal(internalDate: string | undefined): string {
   const mm = (d.getUTCMonth() + 1).toString().padStart(2, '0')
   const dd = d.getUTCDate().toString().padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
-}
-
-function enoent(p: string): Error {
-  const e = new Error(`ENOENT: ${p}`) as Error & { code: string }
-  e.code = 'ENOENT'
-  return e
 }
 
 export async function readdir(

@@ -26,6 +26,7 @@ import {
   S3Resource,
   Workspace,
 } from "@struktoai/mirage-node";
+import { runNotFound } from "./cases.ts";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -294,6 +295,7 @@ async function main(): Promise<void> {
       if (prevSleep === undefined) delete DEFAULT_COMMAND_SAFEGUARDS.sleep;
       else DEFAULT_COMMAND_SAFEGUARDS.sleep = prevSleep;
     }
+    await runNotFound(ws, "/s3");
   } finally {
     await ws.close();
   }

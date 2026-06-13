@@ -17,7 +17,7 @@ import { IndexEntry } from '../../cache/index/config.ts'
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import { decodeBase64 } from '../../utils/base64.ts'
 import { gunzip } from '../../utils/compress.ts'
-import { stripSlash } from '../../util/slash.ts'
+import { stripSlash } from '../../utils/slash.ts'
 import { fetchPathTree } from './_client.ts'
 
 const DEC = new TextDecoder('utf-8', { fatal: false })
