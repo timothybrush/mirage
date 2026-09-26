@@ -397,6 +397,47 @@
         "stdout": "x\n",
         "stderr": ""
       }
+    },
+    {
+      "id": "sro_nested_tar_prep",
+      "seq": 1231066,
+      "command": "mkdir -p /res/sro-src/sub /res/sro-out && printf 'nested\\n' > /res/sro-src/sub/f.txt && printf 'flat\\n' > /res/sro-src/f.txt && tar -cf /res/sro-nested.tar -C /res/sro-src sub/f.txt f.txt && rm -r /res/sro-src",
+      "expect": {
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "id": "sro_nested_tar_reports_parent_and_member_failures",
+      "seq": 1231067,
+      "session": "narrowed",
+      "command": "tar -xf /res/sro-nested.tar -C /res/sro-out",
+      "expect": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "tar: sub: Cannot mkdir: Read-only file system\ntar: sub/f.txt: Cannot open: No such file or directory\ntar: f.txt: Cannot open: Read-only file system\ntar: Exiting with failure status due to previous errors\n"
+      }
+    },
+    {
+      "id": "sro_nested_tar_wrote_nothing",
+      "seq": 1231068,
+      "command": "ls -A /res/sro-out",
+      "expect": {
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "id": "sro_nested_tar_cleanup",
+      "seq": 1231069,
+      "command": "rm -r /res/sro-nested.tar /res/sro-out",
+      "expect": {
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
     }
   ]
 }

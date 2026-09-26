@@ -35,7 +35,7 @@ import {
   Workspace,
 } from '@struktoai/mirage-node'
 
-// A whole custom backend in one script: four core functions over your
+// A whole custom backend in one script: core functions over your
 // data source, a read adapter with optional writes, one GenericVFS. Every generic
 // command (ls, cat, grep, find, head, wc, ...) works for free, and so
 // does versioning, in the shape the content calls for: the wiki's pages
@@ -131,6 +131,16 @@ function write(accessor: WikiAccessor, path: PathSpec, data: Uint8Array): Promis
   return Promise.resolve()
 }
 
+function mkdir(accessor: WikiAccessor, path: PathSpec): Promise<void> {
+  let current: Tree = accessor.pages
+  for (const part of path.vfsPath.split('/').filter(p => p !== '')) {
+    const next = (current[part] ??= {})
+    if (typeof next === 'string') throw enotdir(path)
+    current = next
+  }
+  return Promise.resolve()
+}
+
 // Optional: a bespoke domain verb, registered alongside the generics.
 const wikiTitles = command({
   name: 'wiki_titles',
@@ -151,7 +161,7 @@ const wikiTitles = command({
 function makeIO(writable = true): VFSAdapter<WikiAccessor> {
   return new VFSAdapter({
     read: { readdir, readBytes, stat },
-    ...(writable ? { writes: { write } } : {}),
+    ...(writable ? { writes: { write, mkdir } } : {}),
   })
 }
 
@@ -244,6 +254,14 @@ async function main(): Promise<void> {
     'cat /nested/wiki/notes.md',
     'wc -c /feed/status.md',
     'rm /feed/status.md',
+    'gzip -c /feed/status.md | gunzip',
+    'mkdir /wiki/guides/empty',
+    'cp -r /wiki/guides /wiki/copied',
+    'ls /wiki/copied',
+    'cat /wiki/copied/quickstart.md',
+    'rm -r /wiki/copied /wiki/notes.md',
+    'rm -d /wiki/copied/empty /wiki/notes.md',
+    'cp -r /nested/wiki/guides /nested/wiki/copied',
   ]) {
     await show(ws, line)
   }

@@ -394,6 +394,7 @@ class Operation(StrEnum):
     MKDIR = "mkdir"
     UNLINK = "unlink"
     RMDIR = "rmdir"
+    RM_R = "rm_r"
     RENAME = "rename"
     COPY = "copy"
     TRUNCATE = "truncate"

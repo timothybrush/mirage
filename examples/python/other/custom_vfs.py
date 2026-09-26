@@ -112,6 +112,16 @@ async def write(accessor: WikiAccessor, path: PathSpec, data: bytes) -> None:
     node[name] = data.decode()
 
 
+async def mkdir(accessor: WikiAccessor,
+                path: PathSpec,
+                parents: bool = False) -> None:
+    node = accessor.pages
+    for part in (p for p in path.vfs_path.split("/") if p):
+        node = node.setdefault(part, {})
+        if not isinstance(node, dict):
+            raise NotADirectoryError(path.virtual)
+
+
 # Optional: a bespoke domain verb, registered alongside the generics.
 @command("wiki_titles", vfs="wiki", spec=CommandSpec())
 async def wiki_titles(accessor, paths, texts, opts):
@@ -126,7 +136,7 @@ async def wiki_titles(accessor, paths, texts, opts):
 def make_io(*, writable: bool = True) -> VFSAdapter:
     return VFSAdapter(
         read=ReadOps(readdir=readdir, read_bytes=read_bytes, stat=stat),
-        writes=WriteOps(write=write) if writable else WriteOps(),
+        writes=WriteOps(write=write, mkdir=mkdir) if writable else WriteOps(),
     )
 
 
@@ -213,6 +223,14 @@ async def main():
             "cat /nested/wiki/notes.md",
             "wc -c /feed/status.md",
             "rm /feed/status.md",
+            "gzip -c /feed/status.md | gunzip",
+            "mkdir /wiki/guides/empty",
+            "cp -r /wiki/guides /wiki/copied",
+            "ls /wiki/copied",
+            "cat /wiki/copied/quickstart.md",
+            "rm -r /wiki/copied /wiki/notes.md",
+            "rm -d /wiki/copied/empty /wiki/notes.md",
+            "cp -r /nested/wiki/guides /nested/wiki/copied",
     ):
         await show(ws, line)
 
