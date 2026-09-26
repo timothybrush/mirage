@@ -115,11 +115,21 @@ async def write(accessor: WikiAccessor, path: PathSpec, data: bytes) -> None:
 async def mkdir(accessor: WikiAccessor,
                 path: PathSpec,
                 parents: bool = False) -> None:
+    parts = [p for p in path.vfs_path.split("/") if p]
     node = accessor.pages
-    for part in (p for p in path.vfs_path.split("/") if p):
-        node = node.setdefault(part, {})
+    for i, part in enumerate(parts):
+        leaf = i == len(parts) - 1
+        if part not in node:
+            if not leaf and not parents:
+                raise FileNotFoundError(path.virtual)
+            node[part] = {}
+        elif leaf and (not parents or not isinstance(node[part], dict)):
+            raise FileExistsError(path.virtual)
+        node = node[part]
         if not isinstance(node, dict):
             raise NotADirectoryError(path.virtual)
+    if not parts and not parents:
+        raise FileExistsError(path.virtual)
 
 
 # Optional: a bespoke domain verb, registered alongside the generics.
@@ -224,6 +234,12 @@ async def main():
             "wc -c /feed/status.md",
             "rm /feed/status.md",
             "gzip -c /feed/status.md | gunzip",
+            "mkdir /wiki/new/child",
+            "test ! -e /wiki/new && echo no-partial-parent",
+            "mkdir -p /wiki/new/child",
+            "mkdir /wiki/new/child",
+            "mkdir -p /wiki/new/child",
+            "mkdir -p /wiki/notes.md/child",
             "mkdir /wiki/guides/empty",
             "cp -r /wiki/guides /wiki/copied",
             "ls /wiki/copied",
