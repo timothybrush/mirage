@@ -16,6 +16,7 @@ import type { CacheConfig } from './cache/file/config.ts'
 import type { IndexConfig, RedisIndexConfig } from './cache/index/config.ts'
 import { mcpCli } from './commands/cli/mcp/build.ts'
 import { NAME as MCP_CLI } from './commands/cli/mcp/constants.ts'
+import { cliSpecFor } from './commands/cli/specs.ts'
 import { CLI, placementError } from './commands/cli/types.ts'
 import { CommandSpec } from './commands/spec/types.ts'
 import { IOConfig } from './io/config.ts'
@@ -923,7 +924,8 @@ function looksLikeCliSpec(value: unknown): boolean {
  *
  * A `cli` value carrying a colon points at code: `./tool.mjs:TALLY` (a
  * file) or `my-clis:JIRA` (a package specifier). A bare name stays a name
- * for the workspace to resolve against the registered specs. Mirrors the
+ * for the workspace to resolve against the registered specs, once the CLI it
+ * names is checked to run on the entry's machine. Mirrors the
  * `":" in name` branch of Python's `cli_spec_for`, one layer up:
  * `cliSpecFor` lives in core, which has no filesystem and is synchronous.
  * A `vfs:` value reads the same way, resolved by `buildVfs` rather than
@@ -954,11 +956,29 @@ async function cliEntry(
   }
   const ref = block.cli as string
   if (ref === MCP_CLI) return null
-  if (!ref.includes(':')) return ref
+  if (!ref.includes(':')) {
+    refuseOtherMachine(name, ref, block, cliSpecFor(ref))
+    return ref
+  }
   const value = await host.loadRef(ref)
-  if (value instanceof CLI) return value
-  if (looksLikeCliSpec(value)) return new CLI(value as CLI)
-  throw new Error(`clis entry '${name}': ${ref} is not a CLI`)
+  const cli = value instanceof CLI ? value : looksLikeCliSpec(value) ? new CLI(value as CLI) : null
+  if (cli === null) throw new Error(`clis entry '${name}': ${ref} is not a CLI`)
+  refuseOtherMachine(name, ref, block, cli)
+  return cli
+}
+
+/** A `cli:` entry installs the CLI it names, so that CLI runs on the entry's machine. */
+function refuseOtherMachine(
+  name: string,
+  ref: string,
+  block: Record<string, unknown>,
+  cli: CLI,
+): void {
+  if (cli.machine !== block.machine) {
+    throw new Error(
+      `clis entry '${name}': cli '${ref}' runs on '${cli.machine}', not '${String(block.machine)}'`,
+    )
+  }
 }
 
 /**

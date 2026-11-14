@@ -32,6 +32,7 @@ from mirage.cache.file.config import CacheConfig, RedisCacheConfig
 from mirage.cache.index.config import IndexConfig, RedisIndexConfig
 from mirage.commands.cli import mcp
 from mirage.commands.cli.mcp.constants import NAME as MCP_CLI
+from mirage.commands.cli.specs import cli_spec_for
 from mirage.commands.cli.types import CLI, placement_error
 from mirage.commands.spec.types import CommandSpec
 from mirage.execution.process.config import ProcessPermissions
@@ -664,7 +665,8 @@ def _cli_entry(name: str, block: CLIBlock) -> str | CLI:
     """Resolve one ``clis:`` entry to a spec key or synthesized spec.
 
     A ``cli`` entry stays the registered name for the workspace to
-    resolve; a ``script`` entry becomes a single-node CLI carrying
+    resolve, once the CLI it names is checked to run on the entry's
+    machine; a ``script`` entry becomes a single-node CLI carrying
     the embedded source, so the install is self-contained (the docker
     build-context model).
 
@@ -681,6 +683,12 @@ def _cli_entry(name: str, block: CLIBlock) -> str | CLI:
         )
     if block.cli is None:
         raise ValueError(f"clis entry {name!r} takes cli or script")
+    resolved = cli_spec_for(block.cli)
+    if resolved.machine != block.machine:
+        raise ValueError(
+            f"clis entry {name!r}: cli {block.cli!r} runs on "
+            f"{resolved.machine!r}, not {block.machine!r}"
+        )
     return block.cli
 
 

@@ -11,7 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
+import { registerCliSpec, unregisterCliSpec } from '@struktoai/mirage-core/commands/cli/specs'
 import { CLI } from '@struktoai/mirage-core/commands/cli/types'
+import { CommandSpec } from '@struktoai/mirage-core/commands/spec/types'
 import { Runtime } from '@struktoai/mirage-core/runtime/base'
 import { PyodideRuntime } from '@struktoai/mirage-core/runtime/python/pyodide/runtime'
 import { E2BMachine } from '@struktoai/mirage-core/machine/e2b/handle'
@@ -1234,6 +1236,25 @@ describe('clis section', () => {
       clis: { sl: { machine: 'in_process', config: { token: 'x' } } },
     })
     await expect(configToWorkspaceArgs(neither)).rejects.toThrow(/exactly one of cli or script/)
+  })
+
+  it('a cli entry refuses a cli on another machine', async () => {
+    registerCliSpec(
+      new CLI({
+        spec: new CommandSpec({ name: 'hostpager' }),
+        script: new ScriptSource('print(1)'),
+        machine: 'host',
+      }),
+    )
+    try {
+      const cfg = loadWorkspaceConfig({
+        mounts: { '/data': { vfs: 'ram' } },
+        clis: { p: { cli: 'hostpager', machine: 'in_process' } },
+      })
+      await expect(configToWorkspaceArgs(cfg)).rejects.toThrow(/runs on 'host', not 'in_process'/)
+    } finally {
+      unregisterCliSpec('hostpager')
+    }
   })
 
   it('a cli entry runs in process only', async () => {

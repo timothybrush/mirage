@@ -23,6 +23,9 @@ from mirage import MountBackend, MountMode, Workspace
 from mirage.cache.file.config import CacheConfig, RedisCacheConfig
 from mirage.cache.index import IndexConfig, RedisIndexConfig
 from mirage.commands.cli.mcp import MCPToolsError
+from mirage.commands.cli.specs import register_cli_spec, unregister_cli_spec
+from mirage.commands.cli.types import CLI
+from mirage.commands.spec.types import CommandSpec
 from mirage.config import (
     DiskStoreBlock,
     RamCacheBlock,
@@ -1202,9 +1205,25 @@ mounts:
 
 
 @pytest.mark.asyncio
-async def test_clis_module_dotpath_reference_is_left_alone(tmp_path):
+async def test_clis_module_dotpath_reference_is_left_alone(
+    tmp_path, monkeypatch
+):
     # importlib resolves a dotpath, not the filesystem, so rebasing it
     # would break the import.
+    package = tmp_path / "mypkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "clis.py").write_text(
+        "from mirage import CLI, CLIHandler, CommandSpec, IOResult\n"
+        "TREE = CLI(\n"
+        "    spec=CommandSpec(name='tool',\n"
+        "        subcommands=(CommandSpec(name='run'),)),\n"
+        "    handlers={'run': CLIHandler(\n"
+        "        fn=lambda config, paths, texts, ctx: (b'loaded\\n', IOResult())\n"
+        "    )},\n"
+        ")\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
     cfg_file = tmp_path / "ws.yaml"
     cfg_file.write_text("""\
 mounts:
@@ -1278,6 +1297,29 @@ def test_clis_entry_takes_exactly_one_of_cli_or_script():
                 },
             }
         )
+
+
+def test_a_clis_cli_entry_refuses_a_cli_on_another_machine():
+    register_cli_spec(
+        CLI(
+            spec=CommandSpec(name="hostpager"),
+            script=ScriptSource("print(1)"),
+            machine="host",
+        )
+    )
+    try:
+        cfg = load_config(
+            {
+                "mounts": {"/data": {"vfs": "ram"}},
+                "clis": {"p": {"cli": "hostpager", "machine": "in_process"}},
+            }
+        )
+        with pytest.raises(
+            ValueError, match="runs on 'host', not 'in_process'"
+        ):
+            cfg.to_workspace_kwargs()
+    finally:
+        unregister_cli_spec("hostpager")
 
 
 def test_a_clis_cli_entry_runs_in_process_only():
