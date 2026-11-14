@@ -86,7 +86,7 @@ The bundle mounts one RAM disk at `/tmp`. Set your own mounts, [Python](/typescr
       /project: { vfs: disk, mode: exec, config: { root: . } }
       /slack: { vfs: slack, mode: read, config: { token: !!js process.env.SLACK_BOT_TOKEN } }
     machines:
-      py: { provider: worker, captures: [python, python3] }
+      py: { provider: in_process, runtime: monty, captures: [python, python3] }
     profiles:
       agent:
         commands:
