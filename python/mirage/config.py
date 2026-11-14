@@ -664,9 +664,10 @@ def _build_machines(
 def _cli_entry(name: str, block: CLIBlock) -> str | CLI:
     """Resolve one ``clis:`` entry to a spec key or synthesized spec.
 
-    A ``cli`` entry stays the registered name for the workspace to
-    resolve, once the CLI it names is checked to run on the entry's
-    machine; a ``script`` entry becomes a single-node CLI carrying
+    A ``cli`` entry naming a registered CLI stays that name for the
+    workspace to resolve; a ``source:ATTR`` reference becomes the CLI it
+    loads, so its file runs once. Either is first checked to run on the
+    entry's machine. A ``script`` entry becomes a single-node CLI carrying
     the embedded source, so the install is self-contained (the docker
     build-context model).
 
@@ -689,7 +690,7 @@ def _cli_entry(name: str, block: CLIBlock) -> str | CLI:
             f"clis entry {name!r}: cli {block.cli!r} runs on "
             f"{resolved.machine!r}, not {block.machine!r}"
         )
-    return block.cli
+    return resolved if ":" in block.cli else block.cli
 
 
 class WorkspaceConfig(BaseModel):

@@ -12,6 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import importlib
 import json
 import subprocess
 import sys
@@ -1072,8 +1073,9 @@ clis:
     monkeypatch.chdir(tmp_path.parent)
     cfg = load_config(cfg_file)
     kwargs = cfg.to_workspace_kwargs()
-    ref, _ = kwargs["clis"]["tool"]
-    assert ref == f"{tmp_path / 'tool.py'}:TREE"
+    spec, _ = kwargs["clis"]["tool"]
+    assert isinstance(spec, CLI)
+    assert spec.spec.name == "tool"
     ws = Workspace(**kwargs)
     try:
         result = await ws.shell("tool run")
@@ -1235,8 +1237,46 @@ clis:
     machine: in_process
 """)
     cfg = load_config(cfg_file)
-    ref, _ = cfg.to_workspace_kwargs()["clis"]["tool"]
-    assert ref == "mypkg.clis:TREE"
+    spec, _ = cfg.to_workspace_kwargs()["clis"]["tool"]
+    assert spec is importlib.import_module("mypkg.clis").TREE
+
+
+@pytest.mark.asyncio
+async def test_clis_reference_file_runs_once(tmp_path):
+    # The config loads the file to check its machine; the workspace must
+    # take that CLI, not load the file again, or a file that registers
+    # its own spec fails as already registered.
+    (tmp_path / "tool.py").write_text(
+        "from mirage import CLI, CLIHandler, CommandSpec, IOResult\n"
+        "from mirage.commands.cli.specs import register_cli_spec\n"
+        "TREE = CLI(\n"
+        "    spec=CommandSpec(name='selfreg',\n"
+        "        subcommands=(CommandSpec(name='run'),)),\n"
+        "    handlers={'run': CLIHandler(\n"
+        "        fn=lambda config, paths, texts, ctx: (b'once\\n', IOResult())\n"
+        "    )},\n"
+        ")\n"
+        "register_cli_spec(TREE)\n"
+    )
+    cfg_file = tmp_path / "ws.yaml"
+    cfg_file.write_text("""\
+mounts:
+  /data:
+    vfs: ram
+clis:
+  tool:
+    cli: ./tool.py:TREE
+    machine: in_process
+""")
+    try:
+        ws = Workspace(**load_config(cfg_file).to_workspace_kwargs())
+        try:
+            result = await ws.shell("tool run")
+            assert await result.stdout_str() == "once\n"
+        finally:
+            await ws.close()
+    finally:
+        unregister_cli_spec("selfreg")
 
 
 @pytest.mark.asyncio
