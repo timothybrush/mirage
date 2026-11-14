@@ -925,7 +925,8 @@ function looksLikeCliSpec(value: unknown): boolean {
  * A `cli` value carrying a colon points at code: `./tool.mjs:TALLY` (a
  * file) or `my-clis:JIRA` (a package specifier). A bare name stays a name
  * for the workspace to resolve against the registered specs, once the CLI it
- * names is checked to run on the entry's machine. Mirrors the
+ * names is checked to run on the entry's machine; that check only reads its
+ * `machine`, so a CLI another copy of core built is never rebuilt. Mirrors the
  * `":" in name` branch of Python's `cli_spec_for`, one layer up:
  * `cliSpecFor` lives in core, which has no filesystem and is synchronous.
  * A `vfs:` value reads the same way, resolved by `buildVfs` rather than
@@ -958,14 +959,17 @@ async function cliEntry(
   if (ref === MCP_CLI) return null
   const isRef = ref.includes(':')
   const value = isRef ? await host.loadRef(ref) : cliSpecFor(ref)
-  const cli = value instanceof CLI ? value : looksLikeCliSpec(value) ? new CLI(value as CLI) : null
-  if (cli === null) throw new Error(`clis entry '${name}': ${ref} is not a CLI`)
-  if (cli.machine !== block.machine) {
+  if (!(value instanceof CLI) && !looksLikeCliSpec(value)) {
+    throw new Error(`clis entry '${name}': ${ref} is not a CLI`)
+  }
+  const machine = (value as { machine?: string | null }).machine ?? IN_PROCESS
+  if (machine !== block.machine) {
     throw new Error(
-      `clis entry '${name}': cli '${ref}' runs on '${cli.machine}', not '${String(block.machine)}'`,
+      `clis entry '${name}': cli '${ref}' runs on '${machine}', not '${String(block.machine)}'`,
     )
   }
-  return isRef ? cli : ref
+  if (!isRef) return ref
+  return value instanceof CLI ? value : new CLI(value as CLI)
 }
 
 /**

@@ -1257,6 +1257,30 @@ describe('clis section', () => {
     }
   })
 
+  it('a cli entry installs a registered CLI from another core copy as it is', async () => {
+    // Another copy of core builds a CLI this one's constructor would refuse
+    // (its accessor is not this copy's noopAccessor), so the machine check
+    // reads the registered object and the name passes through untouched.
+    const local = new CLI({
+      spec: new CommandSpec({ name: 'foreignpager' }),
+      script: new ScriptSource('print(1)'),
+      machine: 'in_process',
+    })
+    const foreign = Object.assign({}, local, { accessor: () => null }) as unknown as CLI
+    registerCliSpec(foreign)
+    try {
+      const { options } = await configToWorkspaceArgs(
+        loadWorkspaceConfig({
+          mounts: { '/data': { vfs: 'ram' } },
+          clis: { p: { cli: 'foreignpager', machine: 'in_process' } },
+        }),
+      )
+      expect(options.clis?.p?.[0]).toBe('foreignpager')
+    } finally {
+      unregisterCliSpec('foreignpager')
+    }
+  })
+
   it('a cli entry runs in process only', async () => {
     const mounts = { '/data': { vfs: 'ram' } }
     await configToWorkspaceArgs(
