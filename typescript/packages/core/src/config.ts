@@ -956,29 +956,16 @@ async function cliEntry(
   }
   const ref = block.cli as string
   if (ref === MCP_CLI) return null
-  if (!ref.includes(':')) {
-    refuseOtherMachine(name, ref, block, cliSpecFor(ref))
-    return ref
-  }
-  const value = await host.loadRef(ref)
+  const isRef = ref.includes(':')
+  const value = isRef ? await host.loadRef(ref) : cliSpecFor(ref)
   const cli = value instanceof CLI ? value : looksLikeCliSpec(value) ? new CLI(value as CLI) : null
   if (cli === null) throw new Error(`clis entry '${name}': ${ref} is not a CLI`)
-  refuseOtherMachine(name, ref, block, cli)
-  return cli
-}
-
-/** A `cli:` entry installs the CLI it names, so that CLI runs on the entry's machine. */
-function refuseOtherMachine(
-  name: string,
-  ref: string,
-  block: Record<string, unknown>,
-  cli: CLI,
-): void {
   if (cli.machine !== block.machine) {
     throw new Error(
       `clis entry '${name}': cli '${ref}' runs on '${cli.machine}', not '${String(block.machine)}'`,
     )
   }
+  return isRef ? cli : ref
 }
 
 /**
