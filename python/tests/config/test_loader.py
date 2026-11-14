@@ -12,6 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import importlib
 import json
 import subprocess
 import sys
@@ -23,6 +24,9 @@ from mirage import MountBackend, MountMode, Workspace
 from mirage.cache.file.config import CacheConfig, RedisCacheConfig
 from mirage.cache.index import IndexConfig, RedisIndexConfig
 from mirage.commands.cli.mcp import MCPToolsError
+from mirage.commands.cli.specs import register_cli_spec, unregister_cli_spec
+from mirage.commands.cli.types import CLI
+from mirage.commands.spec.types import CommandSpec
 from mirage.config import (
     DiskStoreBlock,
     RamCacheBlock,
@@ -574,7 +578,11 @@ def test_a_runtime_takes_max_memory_as_a_size_or_bytes():
         {
             "mounts": {"/data": {"vfs": "ram"}},
             "machines": {
-                "monty": {"provider": "worker", "max_memory": 1048576}
+                "monty": {
+                    "provider": "in_process",
+                    "runtime": "monty",
+                    "max_memory": 1048576,
+                }
             },
         }
     )
@@ -584,7 +592,11 @@ def test_a_runtime_takes_max_memory_as_a_size_or_bytes():
         {
             "mounts": {"/data": {"vfs": "ram"}},
             "machines": {
-                "monty": {"provider": "worker", "max_memory": "lots"}
+                "monty": {
+                    "provider": "in_process",
+                    "runtime": "monty",
+                    "max_memory": "lots",
+                }
             },
         }
     )
@@ -726,8 +738,8 @@ mounts:
   /data:
     vfs: ram
 clis:
-  pager: {script: pager.js, machine: quickjs}
-  modpager: {script: pager.mjs, machine: quickjs}
+  pager: {script: pager.js, machine: in_process, runtime: quickjs}
+  modpager: {script: pager.mjs, machine: in_process, runtime: quickjs}
 """)
     cfg = load_config(cfg_file)
     kwargs = cfg.to_workspace_kwargs()
@@ -910,8 +922,12 @@ async def test_clis_section_parses_and_maps_to_kwargs():
         {
             "mounts": {"/data": {"vfs": "ram"}},
             "clis": {
-                "sl": {"cli": "slack", "config": {"token": "x"}},
-                "bare": {"cli": "gws"},
+                "sl": {
+                    "cli": "slack",
+                    "machine": "in_process",
+                    "config": {"token": "x"},
+                },
+                "bare": {"cli": "gws", "machine": "in_process"},
             },
         }
     )
@@ -934,6 +950,7 @@ def test_clis_script_entry_refuses_a_secrets_pointer():
                 "clis": {
                     "pager": {
                         "script": "pager.py",
+                        "machine": "in_process",
                         "config": {
                             "token": {"from": "env", "key": "PAGER_TOKEN"}
                         },
@@ -946,7 +963,11 @@ def test_clis_script_entry_refuses_a_secrets_pointer():
         {
             "mounts": {},
             "clis": {
-                "pager": {"script": "pager.py", "config": {"verbose": True}}
+                "pager": {
+                    "script": "pager.py",
+                    "machine": "in_process",
+                    "config": {"verbose": True},
+                }
             },
         }
     )
@@ -966,7 +987,7 @@ mounts:
 clis:
   pager:
     script: pager.py
-    machine: monty
+    machine: in_process
     config:
       page_size: 20
 """)
@@ -975,7 +996,8 @@ clis:
     spec, config = kwargs["clis"]["pager"]
     assert spec.spec.name == "pager"
     assert spec.script == ScriptSource("print('page')")
-    assert spec.machine == "monty"
+    assert spec.machine == "in_process"
+    assert spec.runtime is None
     assert config == {"page_size": 20}
 
 
@@ -990,6 +1012,7 @@ mounts:
 clis:
   pager:
     script: pager.mjs
+    machine: in_process
 """)
     cfg = load_config(cfg_file)
     kwargs = cfg.to_workspace_kwargs()
@@ -1013,6 +1036,7 @@ mounts:
 clis:
   pager:
     script: pager.js
+    machine: in_process
 """)
     spec, _ = load_config(cfg_file).to_workspace_kwargs()["clis"]["pager"]
     assert spec.script.language == "js"
@@ -1044,12 +1068,14 @@ mounts:
 clis:
   tool:
     cli: ./tool.py:TREE
+    machine: in_process
 """)
     monkeypatch.chdir(tmp_path.parent)
     cfg = load_config(cfg_file)
     kwargs = cfg.to_workspace_kwargs()
-    ref, _ = kwargs["clis"]["tool"]
-    assert ref == f"{tmp_path / 'tool.py'}:TREE"
+    spec, _ = kwargs["clis"]["tool"]
+    assert isinstance(spec, CLI)
+    assert spec.spec.name == "tool"
     ws = Workspace(**kwargs)
     try:
         result = await ws.shell("tool run")
@@ -1181,9 +1207,25 @@ mounts:
 
 
 @pytest.mark.asyncio
-async def test_clis_module_dotpath_reference_is_left_alone(tmp_path):
+async def test_clis_module_dotpath_reference_is_left_alone(
+    tmp_path, monkeypatch
+):
     # importlib resolves a dotpath, not the filesystem, so rebasing it
     # would break the import.
+    package = tmp_path / "mypkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "clis.py").write_text(
+        "from mirage import CLI, CLIHandler, CommandSpec, IOResult\n"
+        "TREE = CLI(\n"
+        "    spec=CommandSpec(name='tool',\n"
+        "        subcommands=(CommandSpec(name='run'),)),\n"
+        "    handlers={'run': CLIHandler(\n"
+        "        fn=lambda config, paths, texts, ctx: (b'loaded\\n', IOResult())\n"
+        "    )},\n"
+        ")\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
     cfg_file = tmp_path / "ws.yaml"
     cfg_file.write_text("""\
 mounts:
@@ -1192,10 +1234,49 @@ mounts:
 clis:
   tool:
     cli: mypkg.clis:TREE
+    machine: in_process
 """)
     cfg = load_config(cfg_file)
-    ref, _ = cfg.to_workspace_kwargs()["clis"]["tool"]
-    assert ref == "mypkg.clis:TREE"
+    spec, _ = cfg.to_workspace_kwargs()["clis"]["tool"]
+    assert spec is importlib.import_module("mypkg.clis").TREE
+
+
+@pytest.mark.asyncio
+async def test_clis_reference_file_runs_once(tmp_path):
+    # The config loads the file to check its machine; the workspace must
+    # take that CLI, not load the file again, or a file that registers
+    # its own spec fails as already registered.
+    (tmp_path / "tool.py").write_text(
+        "from mirage import CLI, CLIHandler, CommandSpec, IOResult\n"
+        "from mirage.commands.cli.specs import register_cli_spec\n"
+        "TREE = CLI(\n"
+        "    spec=CommandSpec(name='selfreg',\n"
+        "        subcommands=(CommandSpec(name='run'),)),\n"
+        "    handlers={'run': CLIHandler(\n"
+        "        fn=lambda config, paths, texts, ctx: (b'once\\n', IOResult())\n"
+        "    )},\n"
+        ")\n"
+        "register_cli_spec(TREE)\n"
+    )
+    cfg_file = tmp_path / "ws.yaml"
+    cfg_file.write_text("""\
+mounts:
+  /data:
+    vfs: ram
+clis:
+  tool:
+    cli: ./tool.py:TREE
+    machine: in_process
+""")
+    try:
+        ws = Workspace(**load_config(cfg_file).to_workspace_kwargs())
+        try:
+            result = await ws.shell("tool run")
+            assert await result.stdout_str() == "once\n"
+        finally:
+            await ws.close()
+    finally:
+        unregister_cli_spec("selfreg")
 
 
 @pytest.mark.asyncio
@@ -1208,6 +1289,7 @@ mounts:
 clis:
   sl:
     cli: slack
+    machine: in_process
 """)
     cfg = load_config(cfg_file)
     ref, _ = cfg.to_workspace_kwargs()["clis"]["sl"]
@@ -1224,6 +1306,7 @@ mounts:
 clis:
   pager:
     script: pager.py
+    machine: in_process
 """)
     cfg = load_config(cfg_file)
     with pytest.raises(FileNotFoundError):
@@ -1236,24 +1319,116 @@ def test_clis_entry_takes_exactly_one_of_cli_or_script():
         load_config(
             {
                 "mounts": mounts,
-                "clis": {"sl": {"cli": "slack", "script": "pager.py"}},
+                "clis": {
+                    "sl": {
+                        "cli": "slack",
+                        "script": "pager.py",
+                        "machine": "in_process",
+                    }
+                },
             }
         )
     with pytest.raises(ValueError, match="exactly one of cli or script"):
         load_config(
             {
                 "mounts": mounts,
-                "clis": {"sl": {"config": {"token": "x"}}},
+                "clis": {
+                    "sl": {"machine": "in_process", "config": {"token": "x"}}
+                },
             }
         )
 
 
-def test_clis_runtime_takes_script():
+def test_a_clis_cli_entry_refuses_a_cli_on_another_machine():
+    register_cli_spec(
+        CLI(
+            spec=CommandSpec(name="hostpager"),
+            script=ScriptSource("print(1)"),
+            machine="host",
+        )
+    )
+    try:
+        cfg = load_config(
+            {
+                "mounts": {"/data": {"vfs": "ram"}},
+                "clis": {"p": {"cli": "hostpager", "machine": "in_process"}},
+            }
+        )
+        with pytest.raises(
+            ValueError, match="runs on 'host', not 'in_process'"
+        ):
+            cfg.to_workspace_kwargs()
+    finally:
+        unregister_cli_spec("hostpager")
+
+
+def test_a_clis_cli_entry_runs_in_process_only():
+    mounts = {"/data": {"vfs": "ram"}}
+    load_config(
+        {
+            "mounts": mounts,
+            "clis": {"sl": {"cli": "slack", "machine": "in_process"}},
+        }
+    )
+    with pytest.raises(ValueError, match="runs on in_process only"):
+        load_config(
+            {
+                "mounts": mounts,
+                "clis": {"sl": {"cli": "slack", "machine": "host"}},
+            }
+        )
     with pytest.raises(ValueError, match="it takes script"):
         load_config(
             {
-                "mounts": {"/data": {"vfs": "ram"}},
-                "clis": {"sl": {"cli": "slack", "machine": "monty"}},
+                "mounts": mounts,
+                "clis": {
+                    "sl": {
+                        "cli": "slack",
+                        "runtime": "monty",
+                        "machine": "in_process",
+                    }
+                },
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"cli": "slack"},
+        {"cli": "slack", "machine": None},
+        {"script": "pager.py"},
+    ],
+)
+def test_a_clis_entry_names_its_machine(entry):
+    with pytest.raises(ValueError, match="clis.sl.machine"):
+        load_config(
+            {"mounts": {"/data": {"vfs": "ram"}}, "clis": {"sl": entry}}
+        )
+
+
+def test_a_clis_script_entry_refuses_a_machine_it_cannot_run_on(tmp_path):
+    (tmp_path / "pager.py").write_text("print(1)")
+    mounts = {"/data": {"vfs": "ram"}}
+    script = str(tmp_path / "pager.py")
+    with pytest.raises(ValueError, match="a script runs on in_process"):
+        load_config(
+            {
+                "mounts": mounts,
+                "clis": {"p": {"script": script, "machine": "py"}},
+            }
+        )
+    with pytest.raises(ValueError, match="a host runs its own programs"):
+        load_config(
+            {
+                "mounts": mounts,
+                "clis": {
+                    "p": {
+                        "script": script,
+                        "machine": "host",
+                        "runtime": "wasi",
+                    }
+                },
             }
         )
 
@@ -1263,7 +1438,13 @@ def test_clis_block_refuses_unknown_keys():
         load_config(
             {
                 "mounts": {"/data": {"vfs": "ram"}},
-                "clis": {"sl": {"cli": "slack", "mode": "write"}},
+                "clis": {
+                    "sl": {
+                        "cli": "slack",
+                        "mode": "write",
+                        "machine": "in_process",
+                    }
+                },
             }
         )
 
@@ -1872,7 +2053,13 @@ def test_an_mcp_entry_needs_its_cli_built_first():
     cfg = load_config(
         {
             "mounts": {},
-            "clis": {"fx": {"cli": "mcp", "config": {"url": "http://x/mcp"}}},
+            "clis": {
+                "fx": {
+                    "cli": "mcp",
+                    "machine": "in_process",
+                    "config": {"url": "http://x/mcp"},
+                }
+            },
         }
     )
     with pytest.raises(ValueError, match="build_mcp_clis"):
@@ -1893,6 +2080,7 @@ async def test_an_mcp_entry_builds_from_its_server_with_an_env_token(
                     "clis": {
                         "fx": {
                             "cli": "mcp",
+                            "machine": "in_process",
                             "config": {
                                 "url": fake.url,
                                 "auth": {"type": "bearer", "token": token},
@@ -1918,7 +2106,13 @@ async def test_an_mcp_entry_is_listed_only_where_its_network_lets_it():
             {
                 "mounts": {},
                 "network": False,
-                "clis": {"fx": {"cli": "mcp", "config": fake.bearer_config()}},
+                "clis": {
+                    "fx": {
+                        "cli": "mcp",
+                        "config": fake.bearer_config(),
+                        "machine": "in_process",
+                    }
+                },
             }
         )
         with pytest.raises(MCPToolsError):
